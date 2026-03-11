@@ -115,7 +115,8 @@ const PortariaA = () => {
         total: vacancies.length,
         disponiveis: vacancies.filter(v => v.status === 'LIVRE' && !(v.type === 'DIRETORIA' && isBusinessHours)).length,
         reservadas: vacancies.filter(v => v.status === 'RESERVADA').length,
-        ocupadas: vacancies.filter(v => v.status === 'OCUPADA').length
+        ocupadas: vacancies.filter(v => v.status === 'OCUPADA').length,
+        restritas: vacancies.filter(v => v.type === 'DIRETORIA').length
     }), [vacancies, isBusinessHours]);
 
     const filteredVacancies = vacancies.filter(v => {
@@ -237,7 +238,8 @@ const PortariaA = () => {
                             {[
                                 { label: 'Disponíveis', value: stats.disponiveis, color: 'bg-emerald-500', ring: 'ring-emerald-500/20' },
                                 { label: 'Reservadas', value: stats.reservadas, color: 'bg-amber-500', ring: 'ring-amber-500/20' },
-                                { label: 'Ocupadas', value: stats.ocupadas, color: 'bg-rose-500', ring: 'ring-rose-500/20' }
+                                { label: 'Ocupadas', value: stats.ocupadas, color: 'bg-rose-500', ring: 'ring-rose-500/20' },
+                                { label: 'Restritas', value: stats.restritas, color: 'bg-slate-400', ring: 'ring-slate-400/20' }
                             ].map((stat) => (
                                 <div key={stat.label} className="flex items-center gap-3">
                                     <div className={cn("size-2.5 rounded-full ring-4", stat.color, stat.ring)}></div>
@@ -634,8 +636,9 @@ const PortariaA = () => {
                                     return false;
                                 }) : null;
 
+                                const isSpotRestricted = matchedSpot?.type === 'DIRETORIA' && isBusinessHours;
                                 const isSpotOccupied = matchedSpot?.status === 'OCUPADA';
-                                const canConfirm = matchedSpot && !isSpotOccupied && !isAlreadyInside;
+                                const canConfirm = matchedSpot && !isSpotOccupied && !isAlreadyInside && !isSpotRestricted;
 
                                 return (
                                     <>
@@ -681,6 +684,17 @@ const PortariaA = () => {
 
                                         {!isAlreadyInside && (
                                             <div className="space-y-3">
+                                                {isSpotRestricted && (
+                                                    <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-3 mb-2 animate-in fade-in slide-in-from-top-1">
+                                                        <ShieldAlert className="text-amber-500 mt-0.5" size={18} />
+                                                        <div>
+                                                            <p className="text-xs font-black text-amber-500 uppercase tracking-widest mb-1">Acesso Negado: Vaga Restrita</p>
+                                                            <p className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">
+                                                                As vagas da Diretoria (A-039 a A-044) são de uso exclusivo durante o horário comercial (06h às 18h).
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                )}
                                                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Vaga de Destino</label>
                                                 <div className="relative group">
                                                     <Map className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-accent transition-colors" size={18} />
@@ -723,14 +737,14 @@ const PortariaA = () => {
                                                                         <div className="w-1 h-1 rounded-full bg-white/10" />
                                                                         <p className={cn(
                                                                             "text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5",
-                                                                            !isSpotOccupied ? "text-emerald-500" : "text-rose-500"
+                                                                            isSpotRestricted ? "text-amber-500" : (!isSpotOccupied ? "text-emerald-500" : "text-rose-500")
                                                                         )}>
                                                                             <span className="text-slate-500">STATUS:</span> 
-                                                                            {matchedSpot.status === 'LIVRE' ? 'DISPONÍVEL' : matchedSpot.status}
+                                                                            {isSpotRestricted ? 'RESTRITA (DIRETORIA)' : (matchedSpot.status === 'LIVRE' ? 'DISPONÍVEL' : matchedSpot.status)}
                                                                         </p>
                                                                     </div>
                                                                 </div>
-                                                                {isSpotOccupied && <Ban className="text-rose-500 opacity-50" size={20} />}
+                                                                {(isSpotOccupied || isSpotRestricted) && <Ban className={cn("opacity-50", isSpotRestricted ? "text-amber-500" : "text-rose-500")} size={20} />}
                                                             </>
                                                         )}
                                                     </div>
