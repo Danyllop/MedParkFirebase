@@ -1,0 +1,65 @@
+================================================================================
+PROJETO: MEDPARK - GESTÃO DE ESTACIONAMENTO HOSPITALAR
+DOCUMENTO: ARQUITETURA DE BACKEND E BANCO DE DADOS (V1.1)
+AUTOR: Danyllo Jonathas Cunha Pereira - Senior Fullstack Developer
+DATA: 08/03/2026
+================================================================================
+
+1. STACK TECNOLÓGICA E PERFORMANCE
+--------------------------------------------------------------------------------
+- Core: Node.js (NestJS) / PostgreSQL.
+- Performance: Redis (Cache de KPIs e Status de Vagas em tempo real).
+- Real-time: WebSockets (Socket.io) para atualização dos pátios A e E.
+- Segurança: JWT (Autenticação) e HASH de senhas (BCrypt).
+
+2. MODELAGEM DO BANCO DE DADOS (REGRAS DE INTEGRIDADE)
+--------------------------------------------------------------------------------
+
+2.1. NÚCLEO DE USUÁRIOS E SEGURANÇA
+  - TABELA 'users':
+    * id (UUID, PK), full_name, email (UNIQUE).
+    * cpf (VARCHAR, UNIQUE) -- Chave única de identificação.
+    * password_hash (TEXT).
+    * role (ENUM: 'ADMIN', 'SUPERVISOR', 'OPERADOR').
+    * must_change_password (BOOLEAN, DEFAULT TRUE) -- Gatilho 'Mud@1234'.
+
+2.2. GESTÃO DE FUNCIONÁRIOS (REGRAS RÍGIDAS)
+  - TABELA 'employees':
+    * id (UUID, PK).
+    * cpf (VARCHAR, UNIQUE) -- APENAS UM registro por CPF.
+    * name, position, unit, bond (EBSERH, UFG, etc.), type, status.
+  - TABELA 'vehicles':
+    * id (UUID, PK), employee_id (FK).
+    * plate (VARCHAR, UNIQUE) -- APENAS UM registro por PLACA.
+    * sticker_number (INTEGER, UNIQUE) -- Identificação Visual Única.
+    * model, color, is_primary.
+
+2.3. PRESTADORES E EMPRESAS (REGRAS FLEXÍVEIS)
+  - TABELA 'companies':
+    * id (UUID, PK).
+    * tax_id (CNPJ/CPF, UNIQUE) -- Chave única da entidade empresarial.
+    * name, service_type.
+  - TABELA 'contractors':
+    * id (UUID, PK), company_id (FK).
+    * cpf (VARCHAR, INDEX) -- Múltiplos registros permitidos (Histórico).
+    * name, role, phone, manager.
+  - TABELA 'contractor_vehicles':
+    * id (UUID, PK), contractor_id (FK), company_id (FK).
+    * plate (VARCHAR, INDEX) -- Permite veículos reserva/substituição.
+    * model, color.
+
+2.4. INFRAESTRUTURA E LOGS
+  - TABELA 'vacancies': id, gate (A/E), number, type, current_status.
+  - TABELA 'access_logs': id (BIGINT), vehicle_id, vacancy_id, entry_time, exit_time.
+
+3. MAPEAMENTO DE APIs (ENDPOINTS)
+--------------------------------------------------------------------------------
+| ROTA                       | MÉTODO | DESCRIÇÃO                                |
+|----------------------------|--------|------------------------------------------|
+| /v1/search/universal       | GET    | Busca unificada (Placa/CPF/Nome/Adesivo).|
+| /v1/portaria/A/entry       | POST   | Registro de entrada Portaria A (90 vagas).|
+| /v1/portaria/E/entry       | POST   | Registro de entrada Portaria E (260 vagas).|
+| /v1/users/reset-password   | PATCH  | Força reset para 'Mud@1234'.             |
+| /v1/vehicles/next-sticker  | GET    | Gera sticker (Max < 11000 ? 11000 : n+1).|
+
+================================================================================

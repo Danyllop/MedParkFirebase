@@ -1,0 +1,265 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// 1. NÚCLEO DE USUÁRIOS E SEGURANÇA
+// ============================================================================
+
+enum UserRole {
+  ADMIN
+  SUPERVISOR
+  OPERADOR
+}
+
+model User {
+  id                  String    @id @default(uuid())
+  fullName            String    @map("full_name")
+  email               String    @unique
+  cpf                 String    @unique
+  passwordHash        String    @map("password_hash")
+  role                UserRole  @default(OPERADOR)
+  mustChangePassword  Boolean   @default(true) @map("must_change_password")
+  status              String    @default("ATIVO") // ATIVO | INATIVO
+  phone               String?
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  // Relações
+  accessLogs          AccessLog[]
+  infractions         Infraction[]
+
+  @@map("users")
+}
+
+// ============================================================================
+// 2. GESTÃO DE FUNCIONÁRIOS (REGRAS RÍGIDAS)
+// ============================================================================
+
+enum RegistrationType {
+  PERMANENTE
+  PROVISORIO
+}
+
+model Employee {
+  id                  String            @id @default(uuid())
+  name                String
+  cpf                 String            @unique
+  position            String            // Cargo
+  unit                String            // Unidade/Setor
+  bond                String            // Vínculo: EBSERH, UFG, etc.
+  phone               String?
+  registrationType    RegistrationType  @default(PERMANENTE) @map("registration_type")
+  expirationDate      DateTime?         @map("expiration_date")
+  status              String            @default("ATIVO") // ATIVO | INATIVO
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+
+  // Relações
+  vehicles            Vehicle[]
+
+  @@map("employees")
+}
+
+model Vehicle {
+  id                  String    @id @default(uuid())
+  employeeId          String    @map("employee_id")
+  plate               String    @unique
+  stickerNumber       Int?      @unique @map("sticker_number")
+  model               String
+  color               String
+  isPrimary           Boolean   @default(true) @map("is_primary")
+  status              String    @default("ATIVO") // ATIVO | INATIVO
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  // Relações
+  employee            Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  accessLogs          AccessLog[]
+
+  @@map("vehicles")
+}
+
+// ============================================================================
+// 3. PRESTADORES E EMPRESAS (REGRAS FLEXÍVEIS)
+// ============================================================================
+
+model Company {
+  id                  String    @id @default(uuid())
+  name                String
+  taxId               String    @unique @map("tax_id") // CNPJ ou CPF
+  segment             String    // Tipo de serviço
+  contact             String?
+  status              String    @default("ATIVO") // ATIVO | INATIVO
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  // Relações
+  contractors         Contractor[]
+  contractorVehicles  ContractorVehicle[]
+
+  @@map("companies")
+}
+
+model Contractor {
+  id                  String    @id @default(uuid())
+  companyId           String?   @map("company_id")
+  name                String
+  cpf                 String    // INDEX - permite múltiplos registros
+  role                String?   // Função
+  phone               String?
+  manager             String?   // Responsável
+  status              String    @default("ATIVO")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  // Relações
+  company             Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  vehicles            ContractorVehicle[]
+  accessLogs          AccessLog[]
+
+  @@index([cpf])
+  @@map("contractors")
+}
+
+model ContractorVehicle {
+  id                  String    @id @default(uuid())
+  contractorId        String    @map("contractor_id")
+  companyId           String?   @map("company_id")
+  plate               String    // INDEX - permite múltiplos
+  model               String
+  color               String
+  status              String    @default("ATIVO")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  // Relações
+  contractor          Contractor @relation(fields: [contractorId], references: [id], onDelete: Cascade)
+  company             Company?   @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  accessLogs          AccessLog[]
+
+  @@index([plate])
+  @@map("contractor_vehicles")
+}
+
+// ============================================================================
+// 4. INFRAESTRUTURA E LOGS
+// ============================================================================
+
+enum Gate {
+  A
+  E
+}
+
+enum VacancyType {
+  COMUM
+  DIRETORIA
+  PNE
+  IDOSO
+}
+
+enum VacancyStatus {
+  LIVRE
+  OCUPADA
+  RESERVADA
+  BLOQUEADA
+}
+
+enum VacancyLocality {
+  EXTERNA
+  SUBSOLO_1
+  SUBSOLO_2
+}
+
+model Vacancy {
+  id                  String          @id @default(uuid())
+  gate                Gate
+  number              String          // Ex: "A-001", "E-042"
+  type                VacancyType     @default(COMUM)
+  locality            VacancyLocality @default(EXTERNA)
+  currentStatus       VacancyStatus   @default(LIVRE) @map("current_status")
+  occupantName        String?         @map("occupant_name")
+  occupantPlate       String?         @map("occupant_plate")
+  occupantVehicle     String?         @map("occupant_vehicle")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+
+  // Relações
+  accessLogs          AccessLog[]
+  infractions         Infraction[]
+
+  @@unique([gate, number])
+  @@map("vacancies")
+}
+
+enum AccessEvent {
+  ENTRADA
+  SAIDA
+  RESERVA
+  LIBERACAO
+}
+
+model AccessLog {
+  id                  String          @id @default(uuid())
+  vacancyId           String?         @map("vacancy_id")
+  vehicleId           String?         @map("vehicle_id")
+  contractorVehicleId String?         @map("contractor_vehicle_id")
+  contractorId        String?         @map("contractor_id")
+  operatorId          String?         @map("operator_id")
+  event               AccessEvent
+  spot                String          // Número da vaga: "A-042"
+  ownerName           String          @map("owner_name")
+  plate               String?
+  entryTime           DateTime?       @map("entry_time")
+  exitTime            DateTime?       @map("exit_time")
+  destination         String?         // Para Portaria E (Almoxarifado, etc.)
+  createdAt           DateTime        @default(now()) @map("created_at")
+
+  // Relações
+  vacancy             Vacancy?        @relation(fields: [vacancyId], references: [id], onDelete: SetNull)
+  vehicle             Vehicle?        @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  contractorVehicle   ContractorVehicle? @relation(fields: [contractorVehicleId], references: [id], onDelete: SetNull)
+  contractor          Contractor?     @relation(fields: [contractorId], references: [id], onDelete: SetNull)
+  operator            User?           @relation(fields: [operatorId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([spot])
+  @@map("access_logs")
+}
+
+// ============================================================================
+// 5. INFRAÇÕES
+// ============================================================================
+
+enum InfractionSeverity {
+  LEVE
+  MEDIA
+  GRAVE
+}
+
+model Infraction {
+  id                  String              @id @default(uuid())
+  vacancyId           String?             @map("vacancy_id")
+  registeredById      String?             @map("registered_by_id")
+  plate               String
+  type                String              // Tipo de infração
+  location            String              // Local
+  severity            InfractionSeverity  @default(MEDIA)
+  description         String?
+  status              String              @default("PENDENTE") // PENDENTE | RESOLVIDA
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+
+  // Relações
+  vacancy             Vacancy?            @relation(fields: [vacancyId], references: [id], onDelete: SetNull)
+  registeredBy        User?               @relation(fields: [registeredById], references: [id], onDelete: SetNull)
+
+  @@index([plate])
+  @@index([createdAt])
+  @@map("infractions")
+}

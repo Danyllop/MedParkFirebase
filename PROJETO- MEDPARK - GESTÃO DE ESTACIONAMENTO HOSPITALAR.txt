@@ -1,0 +1,59 @@
+================================================================================
+PROJETO: MEDPARK - GESTÃO DE ESTACIONAMENTO HOSPITALAR
+DOCUMENTO: ESPECIFICAÇÃO FUNCIONAL (V3.1 - FLEXIBILIDADE DE PRESTADORES)
+AUTOR: Danyllo Jonathas Cunha Pereira - Senior Fullstack Developer
+DATA: 08/03/2026
+================================================================================
+
+1. MÓDULO DE ACESSO E GESTÃO DE USUÁRIOS
+--------------------------------------------------------------------------------
+- Níveis de Acesso:
+    * ADMIN: Controle total e criação de qualquer perfil.
+    * SUPERVISOR: Gere Operadores/Supervisores; cria cadastros Permanentes.
+    * OPERADOR: Uso restrito às Portarias; apenas cadastros Temporários (30 dias).
+- Onboarding: Senha "Mud@1234" dispara troca obrigatória e e-mail de confirmação.
+
+2. DASHBOARD (HOME)
+--------------------------------------------------------------------------------
+- Performance: Caching via Redis e Push Real-time via WebSockets.
+- Visão Geral: Indicadores por categoria (CLT, Prestador, Residente, Interno).
+- Ocupação: Gráficos distintos para Portaria A e Portaria E.
+
+3. PÁGINAS DE GESTÃO (BACKOFFICE)
+--------------------------------------------------------------------------------
+3.1. Funcionários (Regras Rígidas):
+    * Unicidade: Apenas um registro por CPF (Pessoa) e um por Placa (Veículo).
+    * Filtros: Ativos, Inativos, Permanentes, Temporários, Expirados.
+    * Lógica Adesivo: Manual (Legado 10k) e Automático (Botão + | Seq 11000+).
+
+3.2. Prestadores & Empresas (Regras Flexíveis):
+    * Empresas: Cadastro Mestre ÚNICO por CNPJ ou CPF da empresa.
+    * Prestadores (Pessoas): Permite múltiplos cadastros por CPF (Histórico/Contextos).
+    * Veículos de Prestadores: Permite múltiplos cadastros por Placa (Veículos reserva).
+    * Objetivo: Facilitar a entrada de frotas e substituições técnicas rápidas.
+
+4. MÓDULO OPERACIONAL: PORTARIA A (DIRETORIA)
+--------------------------------------------------------------------------------
+- Capacidade: 90 Vagas totais.
+- Busca Universal: Pesquisa por Nome, CPF, Placa ou Adesivo (Func e Prest).
+- Regra de Vaga (Diretoria):
+    * Seg-Sex (06h às 18h): Acesso exclusivo para Diretores cadastrados.
+    * Fora deste horário: Liberado para livre acesso geral.
+- Bloqueio Anti-passback: Proibido entrar se já constar como "Dentro".
+
+5. MÓDULO OPERACIONAL: PORTARIA E (GERAL / ALMOXARIFADO)
+--------------------------------------------------------------------------------
+- Capacidade: 260 Vagas totais.
+- Destino Especial: Opção de fluxo específico para o Almoxarifado.
+- Regra de Fluxo: Prestadores devem comprovar serviço/entrega para acesso.
+- Cadastro Temporário: Operadores registram novatos por até 30 dias.
+
+6. GESTÃO DE VAGAS E PÁTIO
+--------------------------------------------------------------------------------
+- Estados: Livre (Verde), Ocupada (Cinza), Reservada (Amarelo).
+- Operação: Supervisor cria/exclui; Operador reserva ou desocupa.
+
+7. TECNOLOGIAS
+--------------------------------------------------------------------------------
+- Stack: React.js (Front), Node.js (Back), PostgreSQL (DB), Redis (Cache).
+================================================================================
