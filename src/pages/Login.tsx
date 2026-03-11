@@ -43,7 +43,7 @@ const Login = () => {
                 <div className="mb-10 text-center">
                     <div className="flex items-center justify-center gap-2 mb-2">
                         <div className="bg-accent p-2 rounded-lg flex items-center justify-center">
-                            <span className="material-symbols-outlined text-white text-3xl">local_parking</span>
+                            <span className="material-symbols-outlined notranslate text-white text-3xl">local_parking</span>
                         </div>
                         <h1 className="text-3xl font-bold tracking-tight text-white leading-none">MedPark</h1>
                     </div>
@@ -63,7 +63,7 @@ const Login = () => {
                             <label className="text-sm font-medium text-slate-300" htmlFor="email">Email de Acesso</label>
                             <div className="relative group">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500 group-focus-within:text-accent transition-colors">
-                                    <span className="material-symbols-outlined text-xl">mail</span>
+                                    <span className="material-symbols-outlined notranslate text-xl">mail</span>
                                 </div>
                                 <input
                                     className="block w-full pl-11 pr-4 py-3 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all text-sm"
@@ -87,7 +87,7 @@ const Login = () => {
                             </div>
                             <div className="relative group">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500 group-focus-within:text-accent transition-colors">
-                                    <span className="material-symbols-outlined text-xl">lock</span>
+                                    <span className="material-symbols-outlined notranslate text-xl">lock</span>
                                 </div>
                                 <input
                                     className="block w-full pl-11 pr-11 py-3 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all text-sm"
@@ -103,7 +103,7 @@ const Login = () => {
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
                                 >
-                                    <span className="material-symbols-outlined text-xl">
+                                    <span className="material-symbols-outlined notranslate text-xl">
                                         {showPassword ? 'visibility_off' : 'visibility'}
                                     </span>
                                 </button>
@@ -126,7 +126,7 @@ const Login = () => {
                             type="submit"
                         >
                             <span>Acessar o Painel</span>
-                            <span className="material-symbols-outlined text-lg">arrow_forward</span>
+                            <span className="material-symbols-outlined notranslate text-lg">arrow_forward</span>
                         </button>
                     </form>
                 </div>
@@ -134,10 +134,10 @@ const Login = () => {
                 {/* Support / Help */}
                 <div className="mt-8 flex gap-6">
                     <button className="text-xs text-slate-500 hover:text-slate-300 transition-colors flex items-center gap-1 cursor-pointer">
-                        <span className="material-symbols-outlined text-sm">help</span> Suporte Técnico
+                        <span className="material-symbols-outlined notranslate text-sm">help</span> Suporte Técnico
                     </button>
                     <button className="text-xs text-slate-500 hover:text-slate-300 transition-colors flex items-center gap-1 cursor-pointer">
-                        <span className="material-symbols-outlined text-sm">security</span> Segurança
+                        <span className="material-symbols-outlined notranslate text-sm">security</span> Segurança
                     </button>
                 </div>
 
