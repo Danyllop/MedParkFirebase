@@ -1,0 +1,95 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+/**
+ * Nota de Especialista: Em Tailwind 4, @import "tailwindcss" deve vir após 
+ * outros @imports externos ou locais para garantir que as regras injetadas 
+ * não invalidem os seletores subsequentes.
+ */
+
+/* Tailwind 4 Custom Theme Tokens */
+@theme {
+  --color-background-primary: #101827;
+  --color-background-secondary: #1f2937;
+  --color-accent: #3b82f6;
+  --color-accent-hover: #2563eb;
+  --color-accent-soft: rgba(59, 130, 246, 0.1);
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #94a3b8;
+  --color-status-success: #10b981;
+  --color-status-warning: #f59e0b;
+  --color-status-error: #ef4444;
+
+  --radius-card: 1.5rem;
+  --radius-button: 0.75rem;
+  --radius-input: 0.75rem;
+
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-background-primary text-text-primary font-sans antialiased;
+  }
+
+  input {
+    @apply outline-none transition-all duration-200;
+  }
+
+  button,
+  [role="button"],
+  a {
+    @apply cursor-pointer;
+  }
+
+  .clickable {
+    @apply cursor-pointer;
+  }
+
+  /* Custom Scrollbar Global Escura */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-700/80 rounded-full border-2 border-transparent bg-clip-padding;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-600/80;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #334155 transparent;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-background-secondary rounded-card border border-white/5 shadow-xl;
+  }
+
+  .btn-primary {
+    @apply bg-accent hover:bg-accent/90 text-white rounded-button px-4 py-2 font-medium flex items-center justify-center gap-2;
+  }
+
+  .input-field {
+    @apply bg-background-primary border border-white/10 rounded-input px-4 py-2 focus:border-accent/50 focus:ring-1 focus:ring-accent/50 text-text-primary placeholder:text-text-secondary;
+  }
+
+  .glass-card {
+    background: rgba(24, 35, 52, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .bg-mesh {
+    background-color: #101722;
+    background-image: 
+        radial-gradient(at 0% 0%, rgba(60, 131, 246, 0.15) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(60, 131, 246, 0.1) 0px, transparent 50%);
+  }
+}
