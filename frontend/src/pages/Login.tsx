@@ -144,7 +144,7 @@ const Login = () => {
                 {/* Footer */}
                 <footer className="mt-16 text-center">
                     <p className="text-[10px] uppercase tracking-widest text-slate-600 font-medium">
-                        Desenvolvido por <span className="text-slate-400">LogUp Solutions</span>
+                        Desenvolvido por <span className="text-slate-400">LogicUp Solutions</span>
                     </p>
                 </footer>
             </div>
