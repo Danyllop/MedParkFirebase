@@ -12,6 +12,7 @@ import {
     LogOut
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useSearchParams } from 'react-router-dom';
 import DataTable from '../components/ui/DataTable';
 
 // Mock data for the reports
@@ -21,18 +22,45 @@ const mockStats = {
     infracoes: { value: '42', trend: '+2%', type: 'warning' }
 };
 
-const mockLogs = [
-    { id: 1, date: '18/10/2023 - 14:22', name: 'Carlos Eduardo Souza', type: 'PRESTADOR', vehicle: 'Toyota Corolla - BRA2E19', destination: 'Bloco A - Manutenção', isCheckIn: true, operator: 'João Paulo (P-A)' },
-    { id: 2, date: '18/10/2023 - 13:58', name: 'Dra. Amanda Oliveira', type: 'FUNCIONÁRIO', vehicle: 'Jeep Compass - ABC1234', destination: 'Estacionamento Médico', isCheckIn: false, operator: 'João Paulo (P-A)' },
-    { id: 3, date: '18/10/2023 - 13:45', name: 'Logística Pharma S.A.', type: 'PRESTADOR', vehicle: 'Caminhão - XPTO202', destination: 'Bloco E - Almoxarifado', isCheckIn: true, operator: 'Marcos Lima (P-E)' },
-    { id: 4, date: '18/10/2023 - 13:10', name: 'Ricardo Melo', type: 'FUNCIONÁRIO', vehicle: 'Honda Civic - DEF0000', destination: 'Bloco B - Cirurgia', isCheckIn: false, operator: 'João Paulo (P-A)' },
-];
-
 const Reports = () => {
+    const [searchParams] = useSearchParams();
+    const queryVaga = searchParams.get('vaga');
+
     const [dateStart, setDateStart] = useState('');
     const [dateEnd, setDateEnd] = useState('');
     const [unitFilter, setUnitFilter] = useState('Todos');
     const [typeFilter, setTypeFilter] = useState('Todos');
+
+    // Consolidate logs from localStorage
+    const getLogs = () => {
+        const historyA = JSON.parse(localStorage.getItem('gate_a_history') || '[]');
+        const historyE = JSON.parse(localStorage.getItem('gate_e_history') || '[]');
+        
+        // Add source to logs
+        const logsA = historyA.map((log: any) => ({ ...log, source: 'PORTARIA A' }));
+        const logsE = historyE.map((log: any) => ({ ...log, source: 'PORTARIA E' }));
+        
+        let allLogs = [...logsA, ...logsE];
+
+        // Filter by vaga if query param exists
+        if (queryVaga) {
+            allLogs = allLogs.filter(log => log.spot === queryVaga);
+        }
+
+        // Sort by timestamp (descending)
+        return allLogs.sort((a, b) => b.id - a.id);
+    };
+
+    const displayLogs = getLogs().map(log => ({
+        id: log.id,
+        date: log.timestamp,
+        name: log.owner || 'SISTEMA',
+        type: log.event, // Using event as type for visual feedback
+        vehicle: `${log.plate || 'S/ PLACA'}`,
+        destination: log.source,
+        isCheckIn: log.event === 'ENTRADA',
+        operator: log.operator
+    }));
 
     const columns = [
         { header: 'DATA / HORA', accessor: 'date', className: () => 'text-xs text-slate-300' },
@@ -220,7 +248,7 @@ const Reports = () => {
                     </div>
                     
                     <div className="flex-1 overflow-auto no-scrollbar">
-                        <DataTable title="Logs de Acessos Recentes" columns={columns as any} data={mockLogs} />
+                        <DataTable title="Logs de Acessos Recentes" columns={columns as any} data={displayLogs} />
                     </div>
                 </div>
 

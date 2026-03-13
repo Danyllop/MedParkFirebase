@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { User } from '../../pages/Users';
 import { useAuth } from '../../store/AuthContext';
+import AvatarSelector from '../ui/AvatarSelector';
 
 interface UserFormProps {
     initialData?: User;
@@ -17,10 +18,10 @@ const UserForm: React.FC<UserFormProps> = ({ initialData, onSave, onCancel }) =>
         cpf: '',
         email: '',
         role: 'Operador',
-        status: 'ATIVO'
+        status: 'ATIVO',
+        avatar: ''
     });
-    const [password, setPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
+    const [password] = useState('Mud@1234');
 
     useEffect(() => {
         if (initialData) {
@@ -60,16 +61,7 @@ const UserForm: React.FC<UserFormProps> = ({ initialData, onSave, onCancel }) =>
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         
-        if (!initialData) {
-            if (password !== confirmPassword) {
-                alert('As senhas não coincidem!');
-                return;
-            }
-            if (password.length < 6) {
-                alert('A senha deve ter pelo menos 6 caracteres.');
-                return;
-            }
-        }
+        // A senha padrão é sempre usada - sem validação extra necessária
         
         const finalData = { ...formData };
         if (password) {
@@ -82,6 +74,12 @@ const UserForm: React.FC<UserFormProps> = ({ initialData, onSave, onCancel }) =>
 
     return (
         <form onSubmit={handleSubmit} className="flex flex-col gap-6 w-full sm:min-w-[500px]">
+            <AvatarSelector 
+                currentAvatar={formData.avatar || ''} 
+                userName={formData.name || ''}
+                onSelect={(avatar) => setFormData({ ...formData, avatar })} 
+            />
+
             <div className="space-y-4">
                 <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Nome Completo</label>
@@ -139,30 +137,17 @@ const UserForm: React.FC<UserFormProps> = ({ initialData, onSave, onCancel }) =>
                         <div className="space-y-1">
                             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Senha de Acesso</label>
                             <input
-                                type="password"
-                                required={!initialData}
+                                type="text"
+                                readOnly
                                 value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="bg-slate-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm w-full focus:outline-none focus:border-accent/50 focus:bg-slate-900 transition-colors text-white"
-                                placeholder="••••••••"
+                                className="bg-slate-800/30 border border-white/5 rounded-xl px-4 py-2.5 text-sm w-full text-slate-400 cursor-not-allowed font-mono opacity-70"
                             />
+                            <p className="text-[10px] text-slate-600">Senha padrão. O usuário deverá alterar no primeiro acesso.</p>
                         </div>
                     )}
                 </div>
 
-                {!initialData && (
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Confirmar Senha</label>
-                        <input
-                            type="password"
-                            required={!initialData}
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            className="bg-slate-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm w-full focus:outline-none focus:border-accent/50 focus:bg-slate-900 transition-colors text-white"
-                            placeholder="Repita a senha"
-                        />
-                    </div>
-                )}
+
             </div>
 
             <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10 mt-2">

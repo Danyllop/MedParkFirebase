@@ -177,9 +177,39 @@ const PortariaA = () => {
         }
     };
 
+    const handleResetMap = () => {
+        const hasActiveSpots = vacancies.some(v => v.status === 'OCUPADA' || v.status === 'RESERVADA');
+        if (hasActiveSpots) {
+            alert('Não é possível reiniciar o mapa! Existem vagas ocupadas ou reservadas no momento. Libere todas as vagas antes de reiniciar.');
+            return;
+        }
+        
+        if (!confirm('Tem certeza que deseja reiniciar o mapa? Todas as vagas voltarão ao status LIVRE.')) return;
+        generateSpots();
+        setSelectedVacancy(null);
+    };
+
     const handleReserveSpot = (spot: Vacancy) => {
+        if (spot.status === 'RESERVADA') {
+            if (!confirm(`Deseja retirar a reserva da vaga ${spot.number} para ${spot.owner}?`)) return;
+            const updatedVacancies = vacancies.map(v => 
+                v.id === spot.id ? { ...v, status: 'LIVRE' as const, owner: undefined } : v
+            );
+            setVacancies(updatedVacancies);
+            localStorage.setItem('gate_a_vacancies', JSON.stringify(updatedVacancies));
+            
+            addHistoryEntry({
+                spot: spot.number,
+                event: 'LIBERAÇÃO',
+                owner: spot.owner
+            });
+            alert(`Reserva da vaga ${spot.number} retirada com sucesso!`);
+            setSelectedVacancy(null);
+            return;
+        }
+
         if (spot.status !== 'LIVRE') return;
-        const owner = prompt("Nome do colaborador para reserva:");
+        const owner = prompt("Motivo da reserva:");
         if (owner) {
             const updatedVacancies = vacancies.map(v => 
                 v.id === spot.id ? { ...v, status: 'RESERVADA' as const, owner } : v
@@ -301,7 +331,7 @@ const PortariaA = () => {
                         </div>
                         {isAdmin && (
                             <button 
-                                onClick={generateSpots}
+                                onClick={handleResetMap}
                                 className="h-10 px-4 flex items-center gap-2 bg-rose-500/10 border border-rose-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-500/20 transition-all text-rose-500 shadow-sm group"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="lucide lucide-refresh-cw group-hover:rotate-180 transition-transform duration-500"><path d="M21 12a9 9 0 0 0-9-9c-7.2 0-9 1.8-9 9s1.8 9 9 9c1.8 0 3.6-.6 5.1-1.8"/><path d="M19 16v6h6"/><path d="M2.3 2c3.2 0 6.4 1.2 8.8 3.6L12 7"/></svg> REINICIAR MAPA
@@ -480,15 +510,17 @@ const PortariaA = () => {
                                                             <Edit size={14} />
                                                         </button>
                                                         <button 
-                                                            disabled={vacancy.status !== 'LIVRE'}
+                                                            disabled={vacancy.status !== 'LIVRE' && vacancy.status !== 'RESERVADA'}
                                                             onClick={(e) => { e.stopPropagation(); handleReserveSpot(vacancy); }}
                                                             className={cn(
                                                                 "p-1.5 flex items-center justify-center rounded transition-colors",
                                                                 vacancy.status === 'LIVRE'
                                                                     ? "bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-amber-500"
-                                                                    : "bg-slate-800/50 text-slate-600 cursor-not-allowed"
+                                                                    : vacancy.status === 'RESERVADA'
+                                                                        ? "bg-amber-500/20 text-amber-500 hover:bg-amber-500/30"
+                                                                        : "bg-slate-800/50 text-slate-600 cursor-not-allowed"
                                                             )}
-                                                            title={vacancy.status === 'LIVRE' ? "Reservar Vaga" : "Vaga não pode ser Reservada"}
+                                                            title={vacancy.status === 'LIVRE' ? "Reservar Vaga" : vacancy.status === 'RESERVADA' ? "Retirar Reserva" : "Vaga não pode ser Reservada"}
                                                         >
                                                             <Bookmark size={14} />
                                                         </button>
@@ -553,7 +585,7 @@ const PortariaA = () => {
                                             <User size={18} />
                                         </div>
                                         <div>
-                                            <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-0.5">Proprietário</p>
+                                            <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-0.5">Motivo da Reserva</p>
                                             <p className="text-sm font-bold text-white uppercase tracking-tight">{selectedVacancy.owner}</p>
                                         </div>
                                     </div>
@@ -604,13 +636,19 @@ const PortariaA = () => {
                                         <p className="text-sm font-bold text-slate-300">Vaga Reservada</p>
                                         <p className="text-[10px] text-slate-500 mt-1 max-w-[200px]">Esta vaga possui uma reserva ativa para um colaborador específico.</p>
                                     </div>
+                                    <button 
+                                        onClick={() => handleReserveSpot(selectedVacancy)}
+                                        className="w-full py-4 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 font-black text-xs uppercase tracking-[0.2em] rounded-xl transition-all border border-amber-500/20 flex items-center justify-center gap-3"
+                                    >
+                                        <Bookmark size={16} /> Retirar Reserva
+                                    </button>
                                 </div>
                             )}
                         </div>
 
                         <div className="mt-auto pt-6 border-t border-white/5">
                             <button 
-                                onClick={() => navigate(`/history?vaga=${selectedVacancy.number}`)}
+                                onClick={() => navigate(`/reports?vaga=${selectedVacancy.number}`)}
                                 className="w-full py-3 bg-white/5 hover:bg-white/10 text-slate-400 font-bold text-[10px] uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2"
                             >
                                 <Info size={14} /> Ver Histórico da Vaga

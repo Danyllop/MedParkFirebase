@@ -62,6 +62,7 @@ model Employee {
 
   // Relações
   vehicles            Vehicle[]
+  accessLogs          AccessLog[]
 
   @@map("employees")
 }
@@ -161,6 +162,8 @@ enum VacancyType {
   DIRETORIA
   PNE
   IDOSO
+  ALMOXARIFADO
+  CEROF
 }
 
 enum VacancyStatus {
@@ -174,6 +177,11 @@ enum VacancyLocality {
   EXTERNA
   SUBSOLO_1
   SUBSOLO_2
+  AREA_1
+  AREA_2
+  AREA_3
+  AREA_4
+  AREA_5
 }
 
 model Vacancy {
@@ -210,11 +218,16 @@ model AccessLog {
   vehicleId           String?         @map("vehicle_id")
   contractorVehicleId String?         @map("contractor_vehicle_id")
   contractorId        String?         @map("contractor_id")
+  employeeId          String?         @map("employee_id")
   operatorId          String?         @map("operator_id")
   event               AccessEvent
   spot                String          // Número da vaga: "A-042"
   ownerName           String          @map("owner_name")
+  ownerRole           String?         @map("owner_role") // Snapshot: Cargo ou Função
+  ownerPhone          String?         @map("owner_phone") // Snapshot: Telefone
   plate               String?
+  vehicleModel        String?         @map("vehicle_model") // Snapshot
+  vehicleColor        String?         @map("vehicle_color") // Snapshot
   entryTime           DateTime?       @map("entry_time")
   exitTime            DateTime?       @map("exit_time")
   destination         String?         // Para Portaria E (Almoxarifado, etc.)
@@ -225,6 +238,7 @@ model AccessLog {
   vehicle             Vehicle?        @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
   contractorVehicle   ContractorVehicle? @relation(fields: [contractorVehicleId], references: [id], onDelete: SetNull)
   contractor          Contractor?     @relation(fields: [contractorId], references: [id], onDelete: SetNull)
+  employee            Employee?       @relation(fields: [employeeId], references: [id], onDelete: SetNull)
   operator            User?           @relation(fields: [operatorId], references: [id], onDelete: SetNull)
 
   @@index([createdAt])

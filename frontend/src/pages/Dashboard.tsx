@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import {
     Car,
     DoorOpen,
@@ -13,6 +14,7 @@ import {
 import { useModules } from '../store/ModuleContext';
 import { cn } from '../lib/utils';
 import { motion } from 'framer-motion';
+import api from '../services/api';
 
 const StatCard = ({ title, value, percentage, icon: Icon, color, trend, subtitle }: any) => (
     <div className="glass-card p-4 rounded-xl flex flex-col justify-between h-full bg-slate-900/40 border border-white/10">
@@ -75,15 +77,122 @@ const ActivityItem = ({ title, subtitle, time, icon: Icon, color }: any) => (
     </div>
 );
 
+const formatTime = (dateString: string) => {
+    const diff = Math.floor((Date.now() - new Date(dateString).getTime()) / 60000);
+    if (diff < 1) return 'Agora mesmo';
+    if (diff < 60) return `${diff} min atrás`;
+    const hours = Math.floor(diff / 60);
+    if (hours < 24) return `${hours}h atrás`;
+    return `${Math.floor(hours / 24)}d atrás`;
+};
+
 const Dashboard = () => {
     const { modules } = useModules();
-
     const activeGatesCount = [modules.gateA, modules.gateE].filter(Boolean).length;
     const totalGates = 2;
 
+    const [stats, setStats] = useState({
+        totalVacancies: 0,
+        available: 0,
+        occupiedA: 0,
+        totalA: 0,
+        occupiedE: 0,
+        totalE: 0,
+        occupancyRate: '0%',
+        occupancyA: '0%',
+        occupancyE: '0%',
+    });
+    const [recentLogs, setRecentLogs] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchStats = async () => {
+            try {
+                let all: any[] = [];
+                let history: any[] = [];
+
+                try {
+                    const [allRes, logsRes] = await Promise.all([
+                        api.get('/vacancies'),
+                        api.get('/access/history?limit=5'),
+                    ]);
+                    all = allRes.data || [];
+                    history = logsRes.data?.logs ?? logsRes.data ?? [];
+                } catch (apiError) {
+                    console.warn('API indisponível, usando fallback para localStorage');
+                }
+
+                // Fallback / Merge com localStorage (Simulação)
+                let localA = JSON.parse(localStorage.getItem('gate_a_vacancies') || '[]');
+                let localE = JSON.parse(localStorage.getItem('gate_e_vacancies') || '[]');
+                const localHistory = JSON.parse(localStorage.getItem('access_history') || '[]');
+
+                // Se as páginas de portaria nunca foram visitadas, inicializamos com as contagens padrão
+                if (localA.length === 0 && all.length === 0) {
+                    localA = Array.from({ length: 90 }, (_, i) => ({ id: i + 1, status: 'LIVRE' }));
+                }
+                if (localE.length === 0 && all.length === 0) {
+                    localE = Array.from({ length: 200 }, (_, i) => ({ id: i + 1, status: 'LIVRE' }));
+                }
+
+                // Se a API falhar ou retornar menos dados que o esperado, usamos os locais
+                if (all.length === 0) {
+                    // Mapear campos do localStorage para o formato esperado pelo Dashboard
+                    const mappedA = localA.map((v: any) => ({ ...v, gate: 'A', currentStatus: v.status || 'LIVRE' }));
+                    const mappedE = localE.map((v: any) => ({ ...v, gate: 'E', currentStatus: v.status || 'LIVRE' }));
+                    all = [...mappedA, ...mappedE];
+                }
+
+                if (history.length === 0) {
+                    history = localHistory.slice(0, 5);
+                }
+
+                const gateA = all.filter((v: any) => v.gate === 'A');
+                const gateE = all.filter((v: any) => v.gate === 'E');
+
+                const totalA = gateA.length;
+                const totalE = gateE.length;
+                const total = all.length;
+                const available = all.filter((v: any) => v.currentStatus === 'LIVRE').length;
+                const occupiedA = gateA.filter((v: any) => v.currentStatus !== 'LIVRE').length;
+                const occupiedE = gateE.filter((v: any) => v.currentStatus !== 'LIVRE').length;
+                const totalOccupied = all.filter((v: any) => v.currentStatus !== 'LIVRE').length;
+
+                setStats({
+                    totalVacancies: total,
+                    available,
+                    occupiedA,
+                    totalA,
+                    occupiedE,
+                    totalE,
+                    occupancyRate: total > 0 ? `${Math.round((totalOccupied / total) * 100)}%` : '0%',
+                    occupancyA: totalA > 0 ? `${Math.round((occupiedA / totalA) * 100)}%` : '0%',
+                    occupancyE: totalE > 0 ? `${Math.round((occupiedE / totalE) * 100)}%` : '0%',
+                });
+                setRecentLogs(history);
+            } catch (e) {
+                console.error('Erro ao carregar stats do dashboard:', e);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchStats();
+        const interval = setInterval(fetchStats, 60000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const occupancyANum = parseInt(stats.occupancyA);
+    const occupancyENum = parseInt(stats.occupancyE);
+    const occupancyAColor = occupancyANum > 85 ? 'bg-rose-500' : occupancyANum > 60 ? 'bg-amber-500' : 'bg-emerald-500';
+    const occupancyEColor = occupancyENum > 85 ? 'bg-rose-500' : occupancyENum > 60 ? 'bg-amber-500' : 'bg-emerald-500';
+    const statusA = occupancyANum > 85 ? 'Alta' : occupancyANum > 60 ? 'Moderada' : 'Estável';
+    const statusE = occupancyENum > 85 ? 'Alta' : occupancyENum > 60 ? 'Moderada' : 'Estável';
+    const statusABadgeColor = occupancyANum > 85 ? 'text-rose-500 bg-rose-500/10' : occupancyANum > 60 ? 'text-amber-500 bg-amber-500/10' : 'text-emerald-500 bg-emerald-500/10';
+    const statusEBadgeColor = occupancyENum > 85 ? 'text-rose-500 bg-rose-500/10' : occupancyENum > 60 ? 'text-amber-500 bg-amber-500/10' : 'text-emerald-500 bg-emerald-500/10';
+
     return (
         <div className="flex-1 flex flex-col min-w-0 h-full bg-background-dark text-slate-100 overflow-hidden">
-            {/* Main Content */}
             <div className="p-6 flex-1 flex flex-col gap-6 overflow-hidden">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
@@ -103,9 +212,7 @@ const Dashboard = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <StatCard
                         title="Ocupação Total"
-                        value="87%"
-                        percentage="5.2%"
-                        trend="up"
+                        value={loading ? '...' : stats.occupancyRate}
                         icon={Car}
                         color="bg-accent/20 text-accent"
                     />
@@ -118,18 +225,14 @@ const Dashboard = () => {
                     />
                     <StatCard
                         title="Vagas Disponíveis"
-                        value="156"
-                        percentage="2.1%"
-                        trend="down"
+                        value={loading ? '...' : stats.available}
                         icon={CircleParking}
                         color="bg-emerald-500/20 text-emerald-500"
-                        subtitle="Total de 1.200 vagas"
+                        subtitle={loading ? '' : `Total de ${stats.totalVacancies} vagas cadastradas`}
                     />
                     <StatCard
                         title="Infrações Hoje"
-                        value="12"
-                        percentage="3%"
-                        trend="up"
+                        value="—"
                         icon={AlertTriangle}
                         color="bg-rose-500/20 text-rose-500"
                     />
@@ -140,101 +243,51 @@ const Dashboard = () => {
                     <div className="glass-card p-4 rounded-xl bg-slate-900/40 border border-white/10">
                         <div className="flex items-center justify-between mb-1">
                             <p className="text-slate-400 text-xs font-medium">Ocupação Portaria A</p>
-                            <span className="text-[10px] font-bold text-emerald-500 px-2 py-0.5 bg-emerald-500/10 rounded">Estável</span>
+                            <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded", statusABadgeColor)}>{statusA}</span>
                         </div>
                         <div className="flex items-end gap-3">
-                            <p className="text-2xl font-black text-white">74%</p>
+                            <p className="text-2xl font-black text-white">{loading ? '...' : stats.occupancyA}</p>
                             <div className="flex-1 bg-slate-800 h-1.5 rounded-full mb-1.5 overflow-hidden">
-                                <div className="bg-emerald-500 h-full w-[74%] rounded-full shadow-[0_0_10px_rgba(16,185,129,0.3)]"></div>
+                                <div className={cn("h-full rounded-full", occupancyAColor)} style={{ width: stats.occupancyA }}></div>
                             </div>
                         </div>
+                        <p className="text-[10px] text-slate-500 mt-1">{stats.occupiedA} de {stats.totalA} vagas ocupadas</p>
                     </div>
                     <div className="glass-card p-4 rounded-xl bg-slate-900/40 border border-white/10">
                         <div className="flex items-center justify-between mb-1">
                             <p className="text-slate-400 text-xs font-medium">Ocupação Portaria E</p>
-                            <span className="text-[10px] font-bold text-amber-500 px-2 py-0.5 bg-amber-500/10 rounded">Alta</span>
+                            <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded", statusEBadgeColor)}>{statusE}</span>
                         </div>
                         <div className="flex items-end gap-3">
-                            <p className="text-2xl font-black text-white">92%</p>
+                            <p className="text-2xl font-black text-white">{loading ? '...' : stats.occupancyE}</p>
                             <div className="flex-1 bg-slate-800 h-1.5 rounded-full mb-1.5 overflow-hidden">
-                                <div className="bg-amber-500 h-full w-[92%] rounded-full shadow-[0_0_10px_rgba(245,158,11,0.3)]"></div>
+                                <div className={cn("h-full rounded-full", occupancyEColor)} style={{ width: stats.occupancyE }}></div>
                             </div>
                         </div>
+                        <p className="text-[10px] text-slate-500 mt-1">{stats.occupiedE} de {stats.totalE} vagas ocupadas</p>
                     </div>
                 </div>
 
-                {/* Lower Grid */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
-                    {/* Area Occupancy */}
-                    <div className="lg:col-span-2 glass-card rounded-xl overflow-hidden flex flex-col bg-slate-900/40 border border-white/10 h-full">
-                        <div className="p-4 border-b border-white/5 flex items-center justify-between">
-                            <h3 className="font-bold text-sm text-white uppercase tracking-tight">Ocupação por Área</h3>
-                            <div className="flex gap-2">
-                                <button className="px-2 py-0.5 text-[10px] rounded-lg bg-accent text-white font-black uppercase">Ao Vivo</button>
-                                <button className="px-2 py-0.5 text-[10px] rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-colors font-bold uppercase">Histórico</button>
-                            </div>
-                        </div>
-                        <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4 flex-1">
-                            {[
-                                { name: 'Bloco de Internação', value: '81%', sub: 'Vagas Livres: 22', color: 'accent' },
-                                { name: 'Bloco Ambulatorial', value: '72%', sub: 'Vagas Livres: 48', color: 'emerald' }
-                            ].map((block) => (
-                                <div key={block.name} className="bg-white/5 rounded-xl border border-white/5 flex flex-col items-center justify-center p-4 text-center group hover:bg-white/10 transition-colors flex-1">
-                                    <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest mb-1">{block.name}</p>
-                                    <p className="text-4xl font-black text-white">{block.value}</p>
-                                    <p className="text-slate-500 text-xs mt-1">{block.sub}</p>
-                                    <div className="mt-4 w-full bg-slate-800 h-1 rounded-full overflow-hidden max-w-[120px]">
-                                        <div className={cn(
-                                            "h-full rounded-full animate-pulse",
-                                            block.color === 'accent' ? "bg-accent" : "bg-emerald-500"
-                                        )} style={{ width: block.value }}></div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Activity Feed */}
+                {/* Lower Grid - Activity Feed */}
+                <div className="flex-1 min-h-0">
                     <div className="glass-card rounded-xl flex flex-col bg-slate-900/40 border border-white/10 h-full min-h-0">
                         <div className="p-4 border-b border-white/5">
                             <h3 className="font-bold text-sm text-white uppercase tracking-tight">Atividade Recente</h3>
                         </div>
                         <div className="p-2 space-y-1 flex-1 overflow-hidden">
-                            <ActivityItem
-                                title="Veículo ABC-1234 Entrou"
-                                subtitle="Portaria A"
-                                time="Agora mesmo"
-                                icon={LogIn}
-                                color="bg-emerald-500/20 text-emerald-500"
-                            />
-                            <ActivityItem
-                                title="Vaga PNE Ocupada Indevidamente"
-                                subtitle="Internação"
-                                time="5 min atrás"
-                                icon={AlertTriangle}
-                                color="bg-rose-500/20 text-rose-500"
-                            />
-                            <ActivityItem
-                                title="Saída Dr. Henrique"
-                                subtitle="Portaria E"
-                                time="12 min atrás"
-                                icon={LogOut}
-                                color="bg-accent/20 text-accent"
-                            />
-                            <ActivityItem
-                                title="Ambulância SAMU Entrou"
-                                subtitle="Internação"
-                                time="18 min atrás"
-                                icon={LogIn}
-                                color="bg-emerald-500/20 text-emerald-500"
-                            />
-                            <ActivityItem
-                                title="Relatório Diário Gerado"
-                                subtitle="Sistema"
-                                time="1 hora atrás"
-                                icon={History}
-                                color="bg-slate-500/20 text-slate-400"
-                            />
+                            {recentLogs.length === 0 && !loading && (
+                                <p className="text-center text-slate-500 text-xs py-6">Nenhuma atividade recente registrada.</p>
+                            )}
+                            {recentLogs.map((log: any) => (
+                                <ActivityItem
+                                    key={log.id}
+                                    title={`${log.event === 'ENTRADA' ? 'Entrada' : log.event === 'SAIDA' ? 'Saída' : log.event === 'RESERVA' ? 'Reserva' : 'Liberação'}: ${log.ownerName}`}
+                                    subtitle={log.spot ?? '—'}
+                                    time={formatTime(log.createdAt)}
+                                    icon={log.event === 'ENTRADA' || log.event === 'RESERVA' ? LogIn : log.event === 'SAIDA' ? LogOut : History}
+                                    color={log.event === 'ENTRADA' ? "bg-emerald-500/20 text-emerald-500" : log.event === 'SAIDA' ? "bg-accent/20 text-accent" : "bg-slate-500/20 text-slate-400"}
+                                />
+                            ))}
                         </div>
                         <div className="p-3 border-t border-white/5 text-center">
                             <button className="text-[10px] font-bold text-accent hover:underline uppercase tracking-tight">Ver log completo</button>

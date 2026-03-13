@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, CreditCard, Car, Briefcase, MapPin, Phone, Calendar, ShieldCheck } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { maskCPF, maskPhone } from '../../lib/masks';
+import { maskCPF, maskPhone, maskPlate } from '../../lib/masks';
 import { validateCPF, validatePhone, validatePlate } from '../../lib/validation';
 import { useAuth } from '../../store/AuthContext';
 
@@ -289,7 +289,7 @@ const EmployeeForm = ({ onCancel, initialData, onSubmit }: EmployeeFormProps) =>
                                 className={cn("input-field w-full pl-10 upper", errors.plate && "border-status-error")}
                                 placeholder="ABC-1234 ou ABC1D23"
                                 value={formData.plate}
-                                onChange={(e) => handleInputChange('plate', e.target.value)}
+                                onChange={(e) => handleInputChange('plate', maskPlate(e.target.value))}
                             />
                         </div>
                         {errors.plate && <p className="text-status-error text-[10px] mt-1">{errors.plate}</p>}

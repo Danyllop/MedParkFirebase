@@ -1,39 +1,43 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../store/AuthContext';
+import api from '../services/api';
 
 const Login = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const { login } = useAuth();
     const navigate = useNavigate();
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setError(null);
+        setIsSubmitting(true);
 
-        // Simulate login logic
-        if (password === 'Mud@1234') {
-            login({
-                id: '1',
-                name: 'Novo Usuário',
-                email: email,
-                role: 'ADMIN' // Default for this demo logic, but usually it would depend.
+        try {
+            const response = await api.post('/auth/login', {
+                email,
+                password
             });
-            // Armazena flag indicando que precisa de troca de senha
-            localStorage.setItem('medpark_require_password_change', 'true');
-            navigate('/change-password');
-            return;
+
+            const { token, user } = response.data;
+
+            login(token, user);
+
+            if (user.mustChangePassword) {
+                navigate('/change-password');
+            } else {
+                navigate('/');
+            }
+        } catch (err: any) {
+            const message = err.response?.data?.error || 'Erro ao realizar login. Tente novamente.';
+            setError(message);
+        } finally {
+            setIsSubmitting(false);
         }
-
-        login({
-            id: '1',
-            name: 'Admin MedPark',
-            email: email,
-            role: 'ADMIN'
-        });
-
-        navigate('/');
     };
 
     return (
@@ -58,6 +62,11 @@ const Login = () => {
                     </div>
 
                     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+                        {error && (
+                            <div className="bg-red-500/10 border border-red-500/50 text-red-500 text-xs p-3 rounded-lg text-center animate-shake">
+                                {error}
+                            </div>
+                        )}
                         {/* Email Input */}
                         <div className="flex flex-col gap-2">
                             <label className="text-sm font-medium text-slate-300" htmlFor="email">Email de Acesso</label>
@@ -73,6 +82,7 @@ const Login = () => {
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
+                                    disabled={isSubmitting}
                                 />
                             </div>
                         </div>
@@ -97,11 +107,13 @@ const Login = () => {
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     required
+                                    disabled={isSubmitting}
                                 />
                                 <button
                                     className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-white transition-colors cursor-pointer"
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
+                                    disabled={isSubmitting}
                                 >
                                     <span className="material-symbols-outlined notranslate text-xl">
                                         {showPassword ? 'visibility_off' : 'visibility'}
@@ -116,17 +128,28 @@ const Login = () => {
                                 className="w-4 h-4 rounded border-slate-700 bg-slate-900/50 text-accent focus:ring-accent/50 focus:ring-offset-slate-900"
                                 id="remember"
                                 type="checkbox"
+                                disabled={isSubmitting}
                             />
                             <label className="text-xs text-slate-400 cursor-pointer" htmlFor="remember">Manter sessão iniciada</label>
                         </div>
 
                         {/* Action Button */}
                         <button
-                            className="w-full bg-accent hover:bg-accent/90 text-white font-bold py-3 px-4 rounded-lg shadow-lg shadow-accent/20 transition-all flex items-center justify-center gap-2 mt-2 cursor-pointer"
+                            className="w-full bg-accent hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg shadow-lg shadow-accent/20 transition-all flex items-center justify-center gap-2 mt-2 cursor-pointer"
                             type="submit"
+                            disabled={isSubmitting}
                         >
-                            <span>Acessar o Painel</span>
-                            <span className="material-symbols-outlined notranslate text-lg">arrow_forward</span>
+                            {isSubmitting ? (
+                                <>
+                                    <span className="animate-spin material-symbols-outlined notranslate text-lg">sync</span>
+                                    <span>Autenticando...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <span>Acessar o Painel</span>
+                                    <span className="material-symbols-outlined notranslate text-lg">arrow_forward</span>
+                                </>
+                            )}
                         </button>
                     </form>
                 </div>

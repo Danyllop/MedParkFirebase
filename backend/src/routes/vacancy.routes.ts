@@ -1,9 +1,46 @@
 import { Router } from 'express';
 import prisma from '../config/prisma';
-import { authMiddleware, requireRole } from '../middleware/auth';
+import { authMiddleware, requireRole, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 router.use(authMiddleware);
+
+// /v1/vacancies/next-number
+router.get('/next-number', async (req, res) => {
+  try {
+    const { gate } = req.query;
+    if (!gate) {
+      res.status(400).json({ error: 'Parâmetro gate é obrigatório.' });
+      return;
+    }
+
+    const lastVacancy = await (prisma.vacancy as any).findFirst({
+      where: { gate: String(gate).toUpperCase() },
+      orderBy: { number: 'desc' },
+    });
+
+    let nextNumber = '';
+    if (gate === 'A') {
+      if (!lastVacancy) {
+        nextNumber = 'A-001';
+      } else {
+        const numPart = parseInt(lastVacancy.number.replace('A-', ''), 10);
+        nextNumber = `A-${String(numPart + 1).padStart(3, '0')}`;
+      }
+    } else if (gate === 'E') {
+      if (!lastVacancy) {
+        nextNumber = 'E-201'; // Default start for Gate E
+      } else {
+        const numPart = parseInt(lastVacancy.number.replace('E-', ''), 10);
+        nextNumber = `E-${String(numPart + 1).padStart(3, '0')}`;
+      }
+    }
+
+    res.json({ nextNumber });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Erro ao calcular próximo número.', details: error.message });
+  }
+});
 
 // GET /v1/vacancies
 router.get('/', async (req, res) => {
@@ -11,11 +48,11 @@ router.get('/', async (req, res) => {
     const { gate, status, type } = req.query;
     const where: any = {};
 
-    if (gate) where.gate = gate;
-    if (status) where.currentStatus = status;
-    if (type) where.type = type;
+    if (gate) where.gate = gate as string;
+    if (status) where.currentStatus = status as string;
+    if (type) where.type = type as string;
 
-    const vacancies = await prisma.vacancy.findMany({
+    const vacancies = await (prisma.vacancy as any).findMany({
       where,
       orderBy: { number: 'asc' },
     });
@@ -31,7 +68,7 @@ router.post('/', requireRole('ADMIN', 'SUPERVISOR'), async (req, res) => {
   try {
     const { gate, number, type, locality } = req.body;
 
-    const vacancy = await prisma.vacancy.create({
+    const vacancy = await (prisma.vacancy as any).create({
       data: { gate, number, type, locality },
     });
 
@@ -50,7 +87,7 @@ router.post('/batch', requireRole('ADMIN'), async (req, res) => {
   try {
     const { vacancies } = req.body; // Array de { gate, number, type, locality }
 
-    const result = await prisma.vacancy.createMany({
+    const result = await (prisma.vacancy as any).createMany({
       data: vacancies,
       skipDuplicates: true,
     });
@@ -64,10 +101,10 @@ router.post('/batch', requireRole('ADMIN'), async (req, res) => {
 // PATCH /v1/vacancies/:id/status
 router.patch('/:id/status', async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { currentStatus, occupantName, occupantPlate, occupantVehicle } = req.body;
 
-    const vacancy = await prisma.vacancy.update({
+    const vacancy = await (prisma.vacancy as any).update({
       where: { id },
       data: {
         currentStatus,
@@ -86,8 +123,9 @@ router.patch('/:id/status', async (req, res) => {
 // PATCH /v1/vacancies/:id
 router.patch('/:id', requireRole('ADMIN'), async (req, res) => {
   try {
-    const vacancy = await prisma.vacancy.update({
-      where: { id: req.params.id },
+    const id = String(req.params.id);
+    const vacancy = await (prisma.vacancy as any).update({
+      where: { id: id },
       data: req.body,
     });
     res.json(vacancy);
@@ -99,10 +137,68 @@ router.patch('/:id', requireRole('ADMIN'), async (req, res) => {
 // DELETE /v1/vacancies/:id
 router.delete('/:id', requireRole('ADMIN'), async (req, res) => {
   try {
-    await prisma.vacancy.delete({ where: { id: req.params.id } });
-    res.json({ message: 'Vaga excluída.' });
+    const id = req.params.id as string;
+    
+    const vacancy = await (prisma.vacancy as any).findUnique({ where: { id: id } });
+    
+    if (!vacancy) {
+      res.status(404).json({ error: 'Vaga não encontrada.' });
+      return;
+    }
+
+    if (vacancy.currentStatus !== 'LIVRE') {
+      res.status(400).json({ error: 'Não é possível excluir uma vaga ocupada ou reservada.' });
+      return;
+    }
+
+    await (prisma.vacancy as any).delete({ where: { id: id } });
+    res.json({ message: 'Vaga excluída com sucesso.' });
   } catch (error: any) {
     res.status(500).json({ error: 'Erro ao excluir vaga.', details: error.message });
+  }
+});
+
+// PATCH /v1/vacancies/:id/reserve - Alternar reserva
+router.patch('/:id/reserve', async (req: AuthRequest, res) => {
+  try {
+    const id = req.params.id as string;
+    
+    const vacancy = await (prisma.vacancy as any).findUnique({ where: { id: id } });
+    
+    if (!vacancy) {
+      res.status(404).json({ error: 'Vaga não encontrada.' });
+      return;
+    }
+
+    if (vacancy.currentStatus === 'OCUPADA') {
+      res.status(400).json({ error: 'Não é possível reservar uma vaga ocupada.' });
+      return;
+    }
+
+    const newStatus = vacancy.currentStatus === 'RESERVADA' ? 'LIVRE' : 'RESERVADA';
+    
+    const updated = await (prisma.vacancy as any).update({
+      where: { id: id },
+      data: { currentStatus: newStatus }
+    });
+
+    // Registrar no histórico de auditoria
+    const eventType = newStatus === 'RESERVADA' ? 'RESERVA' : 'LIBERACAO';
+    await (prisma.accessLog as any).create({
+      data: {
+        vacancyId: vacancy.id,
+        operatorId: req.user!.userId,
+        event: eventType,
+        spot: vacancy.number,
+        ownerName: 'SISTEMA', // Usar 'SISTEMA' como nome fica melhor no relatório
+        ownerRole: 'RESERVA/LIBERAÇÃO', // Fica mais claro na coluna Cargo/Função
+        createdAt: new Date(),
+      }
+    });
+
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Erro ao processar reserva.', details: error.message });
   }
 });
 

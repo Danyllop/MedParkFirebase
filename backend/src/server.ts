@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { env } from './config/env';
 import { errorHandler } from './middleware/errorHandler';
+import prisma from './config/prisma';
 
 // Routes
 import authRoutes from './routes/auth.routes';
@@ -46,6 +47,26 @@ app.use('/v1/search', searchRoutes);
 // Error handler
 app.use(errorHandler);
 
+// 30-Day Data Retention Policy: Auto-cleanup task
+const cleanupOldLogs = async () => {
+  try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const deleted = await prisma.accessLog.deleteMany({
+      where: {
+        createdAt: { lt: thirtyDaysAgo }
+      }
+    });
+    
+    if (deleted.count > 0) {
+      console.log(`[CLEANUP] Removidos ${deleted.count} logs de acesso antigos (>30 dias).`);
+    }
+  } catch (error) {
+    console.error('[CLEANUP ERROR] Erro ao limpar logs antigos:', error);
+  }
+};
+
 // Start server
 app.listen(env.PORT, () => {
   console.log('');
@@ -58,6 +79,10 @@ app.listen(env.PORT, () => {
   console.log('║  🐘 Database: Neon PostgreSQL                ║');
   console.log('╚══════════════════════════════════════════════╝');
   console.log('');
+
+  // Executar limpeza inicial e agendar a cada 24 horas
+  cleanupOldLogs();
+  setInterval(cleanupOldLogs, 24 * 60 * 60 * 1000);
 });
 
 export default app;

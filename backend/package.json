@@ -9,8 +9,11 @@
     "start": "node dist/server.js",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "db:studio": "prisma studio",
-    "db:generate": "prisma generate"
+    "db: studio": "prisma studio",
+    "db:generate": "prisma generate",
+    "db:clear": "tsx src/scripts/clear-data.ts",
+    "db:generate-a-vagas": "tsx src/scripts/generate-a-vacancies.ts",
+    "db:generate-e-vagas": "tsx src/scripts/generate-e-vacancies.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

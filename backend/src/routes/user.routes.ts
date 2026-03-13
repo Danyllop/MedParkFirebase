@@ -48,7 +48,7 @@ router.patch('/:id', requireRole('ADMIN'), async (req, res) => {
     const { fullName, email, cpf, role, phone, status } = req.body;
 
     const user = await prisma.user.update({
-      where: { id },
+      where: { id: String(id) },
       data: { fullName, email: email?.toLowerCase(), cpf, role, phone, status },
       select: { id: true, fullName: true, email: true, cpf: true, role: true, status: true, createdAt: true },
     });
@@ -70,7 +70,7 @@ router.patch('/:id/reset-password', requireRole('ADMIN', 'SUPERVISOR'), async (r
     const passwordHash = await hashPassword(env.DEFAULT_PASSWORD);
 
     await prisma.user.update({
-      where: { id },
+      where: { id: String(id) },
       data: { passwordHash, mustChangePassword: true },
     });
 
@@ -88,7 +88,7 @@ router.patch('/:id/reset-password', requireRole('ADMIN', 'SUPERVISOR'), async (r
 router.delete('/:id', requireRole('ADMIN'), async (req, res) => {
   try {
     const { id } = req.params;
-    await prisma.user.update({ where: { id }, data: { status: 'INATIVO' } });
+    await prisma.user.update({ where: { id: String(id) }, data: { status: 'INATIVO' } });
     res.json({ message: 'Usuário inativado com sucesso.' });
   } catch (error: any) {
     res.status(500).json({ error: 'Erro ao inativar usuário.', details: error.message });

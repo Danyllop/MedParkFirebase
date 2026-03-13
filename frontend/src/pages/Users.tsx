@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Users as UsersIcon,
     ShieldCheck,
@@ -28,12 +28,7 @@ export interface User {
 }
 
 // Mock data
-const mockStats = [
-    { title: 'Total de Usuários', value: '128', icon: UsersIcon, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-    { title: 'Administradores', value: '12', icon: ShieldCheck, color: 'text-purple-500', bg: 'bg-purple-500/10' },
-    { title: 'Supervisores', value: '24', icon: Briefcase, color: 'text-accent', bg: 'bg-accent/10' },
-    { title: 'Operadores', value: '92', icon: Wrench, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-];
+
 
 const initialUsers: User[] = [
     { id: 1, name: 'Ana Silva', cpf: '123.456.789-00', email: 'ana.silva@ebserh.gov.br', role: 'Admin', registrationDate: '10/01/2023', status: 'ATIVO', avatar: 'https://i.pravatar.cc/150?u=1' },
@@ -48,6 +43,17 @@ const Users = () => {
     const [users, setUsers] = useState<User[]>(initialUsers);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
+    const [dbStats, setDbStats] = useState({ total: 0, admins: 0, supervisors: 0, operators: 0 });
+
+    useEffect(() => {
+        // Intentionally left: production would fetch from /v1/users for counts
+        // For now using the local array
+        const total = users.length;
+        const admins = users.filter(u => u.role === 'Admin').length;
+        const supervisors = users.filter(u => u.role === 'Supervisor').length;
+        const operators = users.filter(u => u.role === 'Operador').length;
+        setDbStats({ total, admins, supervisors, operators });
+    }, [users]);
 
     const handleCreateNewUser = () => {
         setEditingUser(null);
@@ -55,6 +61,7 @@ const Users = () => {
     };
 
     const handleEditUser = (user: User) => {
+        if (user.status !== 'ATIVO') return; // Guard: inactive users cannot be edited
         setEditingUser(user);
         setIsModalOpen(true);
     };
@@ -80,7 +87,7 @@ const Users = () => {
                 role: userData.role || 'Operador',
                 registrationDate: new Date().toLocaleDateString('pt-BR'),
                 status: userData.status || 'ATIVO',
-                avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.name || 'Novo')}&&background=random`
+                avatar: userData.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(userData.name || 'U')}&backgroundColor=1e293b,0f172a&fontWeight=700`
             };
             setUsers([newUser, ...users]);
         }
@@ -139,12 +146,18 @@ const Users = () => {
             accessor: (doc: User) => (
                 <div className="flex items-center justify-end gap-1.5">
                     <button 
-                        onClick={() => handleEditUser(doc)}
-                        className="p-1.5 bg-white/5 hover:bg-white/10 rounded-md text-slate-400 hover:text-white transition-colors" 
-                        title="Editar Usuário"
-                    >
-                        <Edit2 size={14} />
-                    </button>
+                            onClick={() => handleEditUser(doc)}
+                            disabled={doc.status !== 'ATIVO'}
+                            className={cn(
+                                "p-1.5 rounded-md transition-colors",
+                                doc.status === 'ATIVO'
+                                    ? "bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white cursor-pointer"
+                                    : "bg-white/5 text-slate-700 cursor-not-allowed opacity-40"
+                            )}
+                            title={doc.status === 'ATIVO' ? 'Editar Usuário' : 'Usuário inativo — edição bloqueada'}
+                        >
+                            <Edit2 size={14} />
+                        </button>
                     <button 
                         onClick={() => alert(`Senha padrão (Mud@1234) definida para ${doc.name}.\\nUm e-mail informativo foi enviado para ${doc.email} com a nova senha temporária.`)}
                         className="p-1.5 bg-amber-500/10 hover:bg-amber-500/20 rounded-md text-amber-500 transition-colors" 
@@ -195,7 +208,12 @@ const Users = () => {
 
                 {/* Stat Cards */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {mockStats.map((stat, i) => {
+                    {[
+                        { title: 'Total de Usuários', value: dbStats.total, icon: UsersIcon, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+                        { title: 'Administradores', value: dbStats.admins, icon: ShieldCheck, color: 'text-purple-500', bg: 'bg-purple-500/10' },
+                        { title: 'Supervisores', value: dbStats.supervisors, icon: Briefcase, color: 'text-accent', bg: 'bg-accent/10' },
+                        { title: 'Operadores', value: dbStats.operators, icon: Wrench, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+                    ].map((stat, i) => {
                         const Icon = stat.icon;
                         return (
                             <div key={i} className="bg-slate-900/40 border border-white/5 rounded-xl p-4 flex flex-col justify-center gap-2 relative overflow-hidden group">
