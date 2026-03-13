@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Search, Star, User, CreditCard, Hash, Info, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { maskPlate } from '../../lib/masks';
 import { validatePlate } from '../../lib/validation';
 
 interface VehicleFormProps {
@@ -242,7 +243,7 @@ const VehicleForm = ({ onCancel, initialData, onSubmit, employees = [] }: Vehicl
                                 maxLength={7}
                                 className={cn("input-field w-full pl-9 h-11 font-mono font-bold text-accent", errors.plate && "border-status-error")}
                                 value={formData.plate}
-                                onChange={(e) => handleInputChange('plate', e.target.value)}
+                                onChange={(e) => handleInputChange('plate', maskPlate(e.target.value))}
                             />
                         </div>
                         {errors.plate && <p className="text-status-error text-[10px] font-bold mt-1">{errors.plate}</p>}

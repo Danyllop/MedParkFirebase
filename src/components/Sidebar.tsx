@@ -6,7 +6,6 @@ import {
     DoorOpen,
     UserCog,
     LogOut,
-    CirclePlus,
     Settings,
     CircleHelp,
     Car,
@@ -46,10 +45,9 @@ const Sidebar = () => {
 
         { section: 'CONTROLE DE ACESSO', name: 'Portaria A', icon: <Car size={20} />, path: '/gate-a', moduleKey: 'gateA' },
         { section: 'CONTROLE DE ACESSO', name: 'Portaria E', icon: <DoorOpen size={20} />, path: '/gate-e', moduleKey: 'gateE' },
-        { section: 'CONTROLE DE ACESSO', name: 'Gestão do Pátio', icon: <CirclePlus size={20} />, path: '/patio', moduleKey: 'patio' },
+        { section: 'CONTROLE DE ACESSO', name: 'Gestão do Pátio', icon: <History size={20} />, path: '/gestao-patio', moduleKey: 'patio' },
 
         { section: 'ADMINISTRATIVO', name: 'Usuários', icon: <UserCog size={20} />, path: '/users', moduleKey: 'users' },
-        { section: 'ADMINISTRATIVO', name: 'Histórico', icon: <History size={20} />, path: '/history', moduleKey: 'reports' },
         { section: 'ADMINISTRATIVO', name: 'Infrações', icon: <Gavel size={20} />, path: '/infractions', moduleKey: 'infractions' },
         { section: 'ADMINISTRATIVO', name: 'Relatórios', icon: <FileBarChart size={20} />, path: '/reports', moduleKey: 'reports' },
     ];
@@ -57,8 +55,8 @@ const Sidebar = () => {
     let filteredItems = navItems.filter(item => modules[item.moduleKey]);
 
     if (isOperator) {
-        // Operator only sees Gate A, Gate E, and History
-        const allowedPaths = ['/gate-a', '/gate-e', '/history'];
+        // Operator only sees Gate A, Gate E, and Gestão do Pátio (formerly History)
+        const allowedPaths = ['/gate-a', '/gate-e', '/gestao-patio'];
         filteredItems = filteredItems.filter(item => allowedPaths.includes(item.path));
     }
 

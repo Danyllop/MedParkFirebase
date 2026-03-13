@@ -16,6 +16,9 @@ import Modal from '../components/ui/Modal';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { mockCompanies, mockProvidersList, mockProviderVehicles } from '../data/mockData';
+import api from '../services/api';
+import { maskCPF, maskCNPJ, maskPhone, maskPlate } from '../lib/masks';
+import { validateCPF, validateCNPJ, validatePhone, validatePlate } from '../lib/validation';
 
 const Providers = () => {
     const [view, setView] = useState<'companies' | 'providers' | 'vehicles'>('companies');
@@ -30,10 +33,24 @@ const Providers = () => {
     const [isPedestrian, setIsPedestrian] = useState(false);
 
     // Novo Prestador Special States
+    const [providerName, setProviderName] = useState('');
+    const [providerCpf, setProviderCpf] = useState('');
+    const [providerRole, setProviderRole] = useState('');
+    const [providerPhone, setProviderPhone] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [companySearch, setCompanySearch] = useState('');
     const [selectedCompany, setSelectedCompany] = useState<any>(null);
     const [isAutonomousProvider, setIsAutonomousProvider] = useState(false);
     const [isPedestrianProvider, setIsPedestrianProvider] = useState(false);
+    const [vPlate, setVPlate] = useState('');
+    const [vModel, setVModel] = useState('');
+    const [vColor, setVColor] = useState('');
+
+    // Company Registration State
+    const [compName, setCompName] = useState('');
+    const [compCnpj, setCompCnpj] = useState('');
+    const [compRole, setCompRole] = useState('');
+    const [compPhone, setCompPhone] = useState('');
     const [companyResults, setCompanyResults] = useState<any[]>([]);
 
     // Page Search State (Table)
@@ -68,6 +85,13 @@ const Providers = () => {
             setSelectedCompany(null);
             setIsAutonomousProvider(false);
             setIsPedestrianProvider(false);
+            setProviderName('');
+            setProviderCpf('');
+            setProviderRole('');
+            setProviderPhone('');
+            setVPlate('');
+            setVModel('');
+            setVColor('');
             setIsModalOpen(true);
         }
     };
@@ -86,6 +110,99 @@ const Providers = () => {
         if (view === 'companies') setCompanies(updateStatus);
         else if (view === 'providers') setProviders(updateStatus);
         else setVehicles(updateStatus);
+    };
+
+    const handleSaveProvider = async () => {
+        if (!validateCPF(providerCpf)) {
+            alert('Por favor, informe um CPF válido.');
+            return;
+        }
+
+        if (providerPhone && !validatePhone(providerPhone)) {
+            alert('Por favor, informe um telefone completo com DDD.');
+            return;
+        }
+
+        if (!providerName) {
+            alert('Por favor, preencha o nome.');
+            return;
+        }
+
+        if (!isAutonomousProvider && !selectedCompany) {
+            alert('Por favor, selecione uma empresa ou marque como autônomo.');
+            return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            // 1. Criar Prestador
+            const providerRes = await api.post('/contractors', {
+                name: providerName,
+                cpf: providerCpf,
+                role: providerRole,
+                phone: providerPhone,
+                companyId: selectedCompany?.id || null
+            });
+
+            const newProvider = providerRes.data;
+
+            // 2. Se tiver veículo, cadastra
+            if (!isPedestrianProvider && vPlate) {
+                if (!validatePlate(vPlate)) {
+                    alert('Placa inválida. Use o formato ABC-1234 ou ABC1D23.');
+                    setIsSubmitting(false);
+                    return;
+                }
+
+                await api.post(`/contractors/${newProvider.id}/vehicles`, {
+                    plate: vPlate,
+                    model: vModel,
+                    color: vColor,
+                    companyId: selectedCompany?.id || null
+                });
+            }
+
+            // 3. Atualizar Lista ( Ideal seria Re-fetch, mas vamos adicionar ao state para feedback imediato)
+            setProviders([newProvider, ...providers]);
+            setIsModalOpen(false);
+            alert('Prestador cadastrado com sucesso!');
+
+        } catch (error: any) {
+            console.error(error);
+            alert(error.response?.data?.error || 'Erro ao salvar prestador.');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleSaveMain = async () => {
+        if (!validateCPF(providerCpf)) {
+            alert('CPF inválido.');
+            return;
+        }
+
+        if (!isAutonomous && !validateCNPJ(compCnpj)) {
+            alert('CNPJ inválido.');
+            return;
+        }
+
+        if (compPhone && !validatePhone(compPhone)) {
+            alert('Telefone inválido.');
+            return;
+        }
+
+        if (!isAutonomous && !compName) {
+            alert('Razão Social é obrigatória para empresas.');
+            return;
+        }
+
+        if (!isPedestrian && vPlate && !validatePlate(vPlate)) {
+            alert('Placa inválida.');
+            return;
+        }
+
+        alert('Cadastro realizado com sucesso! (Integração Backend pendente para este formulário unificado)');
+        setIsModalOpen(false);
     };
 
     const companyColumns: any[] = [
@@ -285,7 +402,7 @@ const Providers = () => {
                             </button>
                         )}
 
-                        {(view === 'providers' || view === 'vehicles') && (
+                        {view === 'providers' && (
                             <button
                                 onClick={handleAddSpecific}
                                 className="bg-accent hover:bg-accent/90 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-lg shadow-accent/20 flex items-center gap-2 uppercase tracking-tight"
@@ -338,7 +455,7 @@ const Providers = () => {
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 title={
-                    modalType === 'edit'
+                    selectedItem
                         ? `Editar ${view === 'companies' ? 'Empresa' : view === 'providers' ? 'Prestador' : 'Veículo'}`
                         : modalType === 'provider'
                             ? 'Novo Prestador'
@@ -399,33 +516,69 @@ const Providers = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-1">
                                     <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Nome Completo</label>
-                                    <input type="text" className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white" placeholder="NOME DO PRESTADOR..." />
+                                    <input 
+                                        type="text" 
+                                        className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white" 
+                                        placeholder="NOME DO PRESTADOR..." 
+                                        value={providerName}
+                                        onChange={(e) => setProviderName(e.target.value.toUpperCase())}
+                                    />
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">CPF</label>
-                                    <input type="text" className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white font-mono" placeholder="000.000.000-00" />
+                                    <input 
+                                        type="text" 
+                                        className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white font-mono" 
+                                        placeholder="000.000.000-00" 
+                                        value={providerCpf}
+                                        onChange={(e) => setProviderCpf(maskCPF(e.target.value))}
+                                    />
                                 </div>
 
                                 {!isAutonomous && (
                                     <>
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Razão Social</label>
-                                            <input type="text" className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white" placeholder="NOME DA EMPRESA..." />
+                                            <input 
+                                                type="text" 
+                                                className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white uppercase" 
+                                                placeholder="NOME DA EMPRESA..." 
+                                                value={compName}
+                                                onChange={(e) => setCompName(e.target.value.toUpperCase())}
+                                            />
                                         </div>
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">CNPJ</label>
-                                            <input type="text" className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white font-mono" placeholder="00.000.000/0001-00" />
+                                            <input 
+                                                type="text" 
+                                                className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white font-mono" 
+                                                placeholder="00.000.000/0001-00" 
+                                                value={compCnpj}
+                                                onChange={(e) => setCompCnpj(maskCNPJ(e.target.value))}
+                                            />
                                         </div>
                                     </>
                                 )}
 
                                 <div className="space-y-1">
                                     <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Seguimento / Cargo</label>
-                                    <input type="text" className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white" placeholder="EX: TI, LIMPEZA..." />
+                                    <input 
+                                        type="text" 
+                                        className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white uppercase" 
+                                        placeholder="EX: TI, LIMPEZA..." 
+                                        value={compRole}
+                                        onChange={(e) => setCompRole(e.target.value.toUpperCase())}
+                                    />
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Telefone / Contato</label>
-                                    <input type="text" className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white font-mono" placeholder="(62) 99999-9999" />
+                                    <input 
+                                        type="text" 
+                                        className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white font-mono" 
+                                        placeholder="(00) 00000-0000" 
+                                        value={compPhone}
+                                        onChange={(e) => setCompPhone(maskPhone(e.target.value))}
+                                    />
                                 </div>
                             </div>
 
@@ -438,15 +591,33 @@ const Providers = () => {
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Placa</label>
-                                            <input type="text" className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white font-mono" placeholder="XYZ-0000" />
+                                            <input 
+                                                type="text" 
+                                                className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white font-mono" 
+                                                placeholder="XYZ-0000" 
+                                                value={vPlate}
+                                                onChange={(e) => setVPlate(maskPlate(e.target.value))}
+                                            />
                                         </div>
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Modelo</label>
-                                            <input type="text" className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white" placeholder="EX: COROLLA..." />
+                                            <input 
+                                                type="text" 
+                                                className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white uppercase" 
+                                                placeholder="EX: COROLLA..." 
+                                                value={vModel}
+                                                onChange={(e) => setVModel(e.target.value.toUpperCase())}
+                                            />
                                         </div>
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Cor</label>
-                                            <input type="text" className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white" placeholder="EX: PRATA..." />
+                                            <input 
+                                                type="text" 
+                                                className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white uppercase" 
+                                                placeholder="EX: PRATA..." 
+                                                value={vColor}
+                                                onChange={(e) => setVColor(e.target.value.toUpperCase())}
+                                            />
                                         </div>
                                     </div>
                                 </div>
@@ -583,11 +754,43 @@ const Providers = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-white/5 pt-4">
                                 <div className="space-y-1">
                                     <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Nome do Prestador</label>
-                                    <input type="text" className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white" placeholder="NOME..." />
+                                    <input 
+                                        type="text" 
+                                        className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white" 
+                                        placeholder="NOME..." 
+                                        value={providerName}
+                                        onChange={(e) => setProviderName(e.target.value.toUpperCase())}
+                                    />
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">CPF</label>
-                                    <input type="text" className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white font-mono" placeholder="000.000.000-00" />
+                                    <input 
+                                        type="text" 
+                                        className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white font-mono" 
+                                        placeholder="000.000.000-00" 
+                                        value={providerCpf}
+                                        onChange={(e) => setProviderCpf(maskCPF(e.target.value))}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Função / Cargo</label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white" 
+                                        placeholder="EX: ELETRICISTA, TI..." 
+                                        value={providerRole}
+                                        onChange={(e) => setProviderRole(e.target.value.toUpperCase())}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Telefone / Contato</label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white font-mono" 
+                                        placeholder="(00) 00000-0000" 
+                                        value={providerPhone}
+                                        onChange={(e) => setProviderPhone(maskPhone(e.target.value))}
+                                    />
                                 </div>
                             </div>
 
@@ -600,15 +803,33 @@ const Providers = () => {
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Placa</label>
-                                            <input type="text" className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white font-mono" placeholder="XYZ-0000" />
+                                            <input 
+                                                type="text" 
+                                                className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white font-mono" 
+                                                placeholder="XYZ-0000" 
+                                                value={vPlate}
+                                                onChange={(e) => setVPlate(e.target.value.toUpperCase())}
+                                            />
                                         </div>
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Modelo</label>
-                                            <input type="text" className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white" placeholder="EX: COROLLA..." />
+                                            <input 
+                                                type="text" 
+                                                className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white" 
+                                                placeholder="EX: COROLLA..." 
+                                                value={vModel}
+                                                onChange={(e) => setVModel(e.target.value.toUpperCase())}
+                                            />
                                         </div>
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Cor</label>
-                                            <input type="text" className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white" placeholder="EX: PRATA..." />
+                                            <input 
+                                                type="text" 
+                                                className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white" 
+                                                placeholder="EX: PRATA..." 
+                                                value={vColor}
+                                                onChange={(e) => setVColor(e.target.value.toUpperCase())}
+                                            />
                                         </div>
                                     </div>
                                 </div>
@@ -616,17 +837,22 @@ const Providers = () => {
                         </div>
                     )}
 
-
-                    {modalType === 'edit' && (
-                        <div className="flex flex-col items-center py-12 text-slate-400 italic font-mono text-xs">
-                            <Edit2 size={48} className="mb-4 opacity-10" />
-                            Editando ID: {selectedItem?.id}
-                        </div>
-                    )}
-
                     <div className="flex justify-end gap-3 mt-4 border-t border-white/5 pt-4">
-                        <button onClick={() => setIsModalOpen(false)} className="px-6 py-2 rounded-lg text-xs font-bold text-slate-500 hover:bg-white/5 transition-all">CANCELAR</button>
-                        <button className="bg-accent hover:bg-accent/90 text-white px-8 py-2 rounded-lg text-xs font-black shadow-lg shadow-accent/20 transition-all uppercase tracking-widest">Salvar</button>
+                        <button 
+                            onClick={() => setIsModalOpen(false)} 
+                            className="px-6 py-2 rounded-lg text-xs font-bold text-slate-500 hover:bg-white/5 transition-all"
+                            disabled={isSubmitting}
+                        >
+                            CANCELAR
+                        </button>
+                        <button 
+                            onClick={modalType === 'provider' ? handleSaveProvider : handleSaveMain}
+                            className="bg-accent hover:bg-accent/90 disabled:opacity-50 text-white px-8 py-2 rounded-lg text-xs font-black shadow-lg shadow-accent/20 transition-all uppercase tracking-widest flex items-center gap-2"
+                            disabled={isSubmitting}
+                        >
+                            {isSubmitting && <span className="animate-spin material-symbols-outlined notranslate text-xs">sync</span>}
+                            Salvar
+                        </button>
                     </div>
                 </div>
             </Modal>

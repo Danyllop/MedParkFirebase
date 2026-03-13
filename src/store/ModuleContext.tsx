@@ -16,6 +16,7 @@ export interface ModulesState {
 interface ModuleContextType {
     modules: ModulesState;
     toggleModule: (module: keyof ModulesState) => void;
+    updateModules: (newModules: ModulesState) => void;
 }
 
 const defaultState: ModulesState = {
@@ -53,8 +54,12 @@ export const ModuleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }));
     };
 
+    const updateModules = (newModules: ModulesState) => {
+        setModules(newModules);
+    };
+
     return (
-        <ModuleContext.Provider value={{ modules, toggleModule }}>
+        <ModuleContext.Provider value={{ modules, toggleModule, updateModules }}>
             {children}
         </ModuleContext.Provider>
     );

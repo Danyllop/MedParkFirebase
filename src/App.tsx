@@ -10,11 +10,11 @@ import Providers from './pages/Providers';
 import GateA from './pages/GateA';
 import GateE from './pages/GateE';
 import Modules from './pages/Modules';
-import History from './pages/History';
+import GestaoPatio from './pages/GestaoPatio';
 import Infractions from './pages/Infractions';
 import Reports from './pages/Reports';
 import Users from './pages/Users';
-import { Patio } from './pages/ModulePlaceholders';
+import ResetPassword from './pages/ResetPassword';
 import { ModuleProvider } from './store/ModuleContext';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -36,6 +36,7 @@ function App() {
         <Router>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/change-password" element={
               <ProtectedRoute>
                 <ChangePassword />
@@ -48,13 +49,13 @@ function App() {
               </ProtectedRoute>
             }>
               <Route index element={<Dashboard />} />
+              <Route path="dashboard" element={<Dashboard />} />
               <Route path="employees" element={<Employees />} />
               <Route path="providers" element={<Providers />} />
               <Route path="gate-a" element={<GateA />} />
               <Route path="gate-e" element={<GateE />} />
-              <Route path="history" element={<History />} />
+              <Route path="gestao-patio" element={<GestaoPatio />} />
               <Route path="modules" element={<Modules />} />
-              <Route path="patio" element={<Patio />} />
               <Route path="users" element={<Users />} />
               <Route path="infractions" element={<Infractions />} />
               <Route path="reports" element={<Reports />} />

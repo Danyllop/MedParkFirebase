@@ -109,7 +109,52 @@ const PortariaA = () => {
         } else {
             generateSpots();
         }
+
+        // Initialize history if empty
+        const savedHistory = localStorage.getItem('gate_a_history');
+        if (!savedHistory) {
+            const initialHistory = [
+                { id: 1, timestamp: '10/03/2026 14:30', spot: 'A-042', event: 'ENTRADA', owner: 'ALAN FERNANDES DA SILVA', plate: 'KDC-1234', operator: 'MARIA SILVA' },
+                { id: 2, timestamp: '10/03/2026 15:15', spot: 'A-015', event: 'SAÍDA', owner: 'DANYLLO PEREIRA', plate: 'ABC-5E21', operator: 'JOÃO GOMES' },
+                { id: 3, timestamp: '10/03/2026 15:45', spot: 'A-088', event: 'RESERVA', owner: 'MARIA OLIVEIRA', plate: 'XYZ-9876', operator: 'MARIA SILVA' },
+                { id: 4, timestamp: '10/03/2026 16:20', spot: 'E-012', event: 'ENTRADA', owner: 'JOSE ALMEIDA', plate: 'BRA-1A22', operator: 'RICARDO SOUZA' },
+                { id: 5, timestamp: '10/03/2026 17:05', spot: 'A-042', event: 'SAÍDA', owner: 'ALAN FERNANDES DA SILVA', plate: 'KDC-1234', operator: 'JOÃO GOMES' },
+            ];
+            localStorage.setItem('gate_a_history', JSON.stringify(initialHistory));
+        }
     }, []);
+
+    const addHistoryEntry = (entry: any) => {
+        const savedHistory = JSON.parse(localStorage.getItem('gate_a_history') || '[]');
+        const newEntry = {
+            id: Date.now(),
+            timestamp: new Date().toLocaleString('pt-BR').slice(0, 16).replace(',', ''),
+            operator: user?.name?.toUpperCase() || 'ADMIN',
+            ...entry
+        };
+        const updatedHistory = [newEntry, ...savedHistory].slice(0, 150);
+        localStorage.setItem('gate_a_history', JSON.stringify(updatedHistory));
+    };
+
+    const handleReleaseSpot = (spot: Vacancy) => {
+        const updatedVacancies = vacancies.map(v => 
+            v.id === spot.id 
+                ? { ...v, status: 'LIVRE' as const, owner: undefined, vehicle: undefined, plate: undefined }
+                : v
+        );
+        setVacancies(updatedVacancies);
+        localStorage.setItem('gate_a_vacancies', JSON.stringify(updatedVacancies));
+        
+        addHistoryEntry({
+            spot: spot.number,
+            event: 'SAÍDA',
+            owner: spot.owner,
+            plate: spot.plate
+        });
+        
+        setSelectedVacancy(null);
+        alert(`Vaga ${spot.number} liberada com sucesso!`);
+    };
 
     const stats = useMemo(() => ({
         total: vacancies.length,
@@ -118,6 +163,78 @@ const PortariaA = () => {
         ocupadas: vacancies.filter(v => v.status === 'OCUPADA').length,
         restritas: vacancies.filter(v => v.type === 'DIRETORIA').length
     }), [vacancies, isBusinessHours]);
+
+    const handleEditSpot = (spot: Vacancy) => {
+        if (!isAdmin) return;
+        const newType = prompt("Novo tipo (DIRETORIA, COMUM, PNE, IDOSO):", spot.type) as Vacancy['type'];
+        if (newType && ['DIRETORIA', 'COMUM', 'PNE', 'IDOSO'].includes(newType)) {
+            const updatedVacancies = vacancies.map(v => 
+                v.id === spot.id ? { ...v, type: newType } : v
+            );
+            setVacancies(updatedVacancies);
+            localStorage.setItem('gate_a_vacancies', JSON.stringify(updatedVacancies));
+            alert(`Vaga ${spot.number} atualizada para ${newType}`);
+        }
+    };
+
+    const handleResetMap = () => {
+        const hasActiveSpots = vacancies.some(v => v.status === 'OCUPADA' || v.status === 'RESERVADA');
+        if (hasActiveSpots) {
+            alert('Não é possível reiniciar o mapa! Existem vagas ocupadas ou reservadas no momento. Libere todas as vagas antes de reiniciar.');
+            return;
+        }
+        
+        if (!confirm('Tem certeza que deseja reiniciar o mapa? Todas as vagas voltarão ao status LIVRE.')) return;
+        generateSpots();
+        setSelectedVacancy(null);
+    };
+
+    const handleReserveSpot = (spot: Vacancy) => {
+        if (spot.status === 'RESERVADA') {
+            if (!confirm(`Deseja retirar a reserva da vaga ${spot.number} para ${spot.owner}?`)) return;
+            const updatedVacancies = vacancies.map(v => 
+                v.id === spot.id ? { ...v, status: 'LIVRE' as const, owner: undefined } : v
+            );
+            setVacancies(updatedVacancies);
+            localStorage.setItem('gate_a_vacancies', JSON.stringify(updatedVacancies));
+            
+            addHistoryEntry({
+                spot: spot.number,
+                event: 'LIBERAÇÃO',
+                owner: spot.owner
+            });
+            alert(`Reserva da vaga ${spot.number} retirada com sucesso!`);
+            setSelectedVacancy(null);
+            return;
+        }
+
+        if (spot.status !== 'LIVRE') return;
+        const owner = prompt("Motivo da reserva:");
+        if (owner) {
+            const updatedVacancies = vacancies.map(v => 
+                v.id === spot.id ? { ...v, status: 'RESERVADA' as const, owner } : v
+            );
+            setVacancies(updatedVacancies);
+            localStorage.setItem('gate_a_vacancies', JSON.stringify(updatedVacancies));
+            
+            addHistoryEntry({
+                spot: spot.number,
+                event: 'RESERVA',
+                owner
+            });
+            alert(`Vaga ${spot.number} reservada para ${owner}`);
+        }
+    };
+
+    const handleDeleteSpot = (spot: Vacancy) => {
+        if (!isAdmin) return;
+        if (confirm(`Tem certeza que deseja excluir a vaga ${spot.number}?`)) {
+            const updatedVacancies = vacancies.filter(v => v.id !== spot.id);
+            setVacancies(updatedVacancies);
+            localStorage.setItem('gate_a_vacancies', JSON.stringify(updatedVacancies));
+            alert(`Vaga ${spot.number} excluída.`);
+        }
+    };
 
     const filteredVacancies = vacancies.filter(v => {
         const matchesSearch = v.number.includes(searchTerm.toUpperCase()) ||
@@ -214,7 +331,7 @@ const PortariaA = () => {
                         </div>
                         {isAdmin && (
                             <button 
-                                onClick={generateSpots}
+                                onClick={handleResetMap}
                                 className="h-10 px-4 flex items-center gap-2 bg-rose-500/10 border border-rose-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-500/20 transition-all text-rose-500 shadow-sm group"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="lucide lucide-refresh-cw group-hover:rotate-180 transition-transform duration-500"><path d="M21 12a9 9 0 0 0-9-9c-7.2 0-9 1.8-9 9s1.8 9 9 9c1.8 0 3.6-.6 5.1-1.8"/><path d="M19 16v6h6"/><path d="M2.3 2c3.2 0 6.4 1.2 8.8 3.6L12 7"/></svg> REINICIAR MAPA
@@ -381,7 +498,7 @@ const PortariaA = () => {
                                                     <div className="flex items-center justify-end gap-2">
                                                         <button 
                                                             disabled={vacancy.status !== 'LIVRE'}
-                                                            onClick={(e) => { e.stopPropagation(); /* TODO: Implement Edit */ }}
+                                                            onClick={(e) => { e.stopPropagation(); handleEditSpot(vacancy); }}
                                                             className={cn(
                                                                 "p-1.5 flex items-center justify-center rounded transition-colors",
                                                                 vacancy.status === 'LIVRE' 
@@ -393,21 +510,23 @@ const PortariaA = () => {
                                                             <Edit size={14} />
                                                         </button>
                                                         <button 
-                                                            disabled={vacancy.status !== 'LIVRE'}
-                                                            onClick={(e) => { e.stopPropagation(); /* TODO: Implement Reserve */ }}
+                                                            disabled={vacancy.status !== 'LIVRE' && vacancy.status !== 'RESERVADA'}
+                                                            onClick={(e) => { e.stopPropagation(); handleReserveSpot(vacancy); }}
                                                             className={cn(
                                                                 "p-1.5 flex items-center justify-center rounded transition-colors",
                                                                 vacancy.status === 'LIVRE'
                                                                     ? "bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-amber-500"
-                                                                    : "bg-slate-800/50 text-slate-600 cursor-not-allowed"
+                                                                    : vacancy.status === 'RESERVADA'
+                                                                        ? "bg-amber-500/20 text-amber-500 hover:bg-amber-500/30"
+                                                                        : "bg-slate-800/50 text-slate-600 cursor-not-allowed"
                                                             )}
-                                                            title={vacancy.status === 'LIVRE' ? "Reservar Vaga" : "Vaga não pode ser Reservada"}
+                                                            title={vacancy.status === 'LIVRE' ? "Reservar Vaga" : vacancy.status === 'RESERVADA' ? "Retirar Reserva" : "Vaga não pode ser Reservada"}
                                                         >
                                                             <Bookmark size={14} />
                                                         </button>
                                                         {isAdmin && (
                                                             <button 
-                                                                onClick={(e) => { e.stopPropagation(); /* TODO: Implement Delete */ }}
+                                                                onClick={(e) => { e.stopPropagation(); handleDeleteSpot(vacancy); }}
                                                                 className="p-1.5 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-rose-500 transition-colors"
                                                                 title="Deletar Vaga"
                                                             >
@@ -466,7 +585,7 @@ const PortariaA = () => {
                                             <User size={18} />
                                         </div>
                                         <div>
-                                            <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-0.5">Proprietário</p>
+                                            <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-0.5">Motivo da Reserva</p>
                                             <p className="text-sm font-bold text-white uppercase tracking-tight">{selectedVacancy.owner}</p>
                                         </div>
                                     </div>
@@ -481,7 +600,10 @@ const PortariaA = () => {
                                         </div>
                                     </div>
                                     
-                                    <button className="w-full mt-4 py-4 bg-accent hover:bg-accent/90 text-white font-black text-xs uppercase tracking-[0.2em] rounded-xl transition-all shadow-xl shadow-accent/20 flex items-center justify-center gap-3">
+                                    <button 
+                                        onClick={() => handleReleaseSpot(selectedVacancy)}
+                                        className="w-full mt-4 py-4 bg-accent hover:bg-accent/90 text-white font-black text-xs uppercase tracking-[0.2em] rounded-xl transition-all shadow-xl shadow-accent/20 flex items-center justify-center gap-3"
+                                    >
                                         Liberar Vaga
                                     </button>
                                 </>
@@ -494,7 +616,14 @@ const PortariaA = () => {
                                         <p className="text-sm font-bold text-slate-300">Vaga Disponível</p>
                                         <p className="text-[10px] text-slate-500 mt-1 max-w-[200px]">Esta vaga está pronta para ser ocupada por um novo veículo.</p>
                                     </div>
-                                    <button className="w-full py-4 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 font-black text-xs uppercase tracking-[0.2em] rounded-xl transition-all border border-emerald-500/20 flex items-center justify-center gap-3">
+                                    <button 
+                                        onClick={() => {
+                                            setEntrySpotSearch(selectedVacancy.number);
+                                            setIsManualEntryOpen(true);
+                                            setManualEntryStep('search');
+                                        }}
+                                        className="w-full py-4 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 font-black text-xs uppercase tracking-[0.2em] rounded-xl transition-all border border-emerald-500/20 flex items-center justify-center gap-3"
+                                    >
                                         <LogIn size={16} /> Entrada Manual
                                     </button>
                                 </div>
@@ -507,13 +636,19 @@ const PortariaA = () => {
                                         <p className="text-sm font-bold text-slate-300">Vaga Reservada</p>
                                         <p className="text-[10px] text-slate-500 mt-1 max-w-[200px]">Esta vaga possui uma reserva ativa para um colaborador específico.</p>
                                     </div>
+                                    <button 
+                                        onClick={() => handleReserveSpot(selectedVacancy)}
+                                        className="w-full py-4 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 font-black text-xs uppercase tracking-[0.2em] rounded-xl transition-all border border-amber-500/20 flex items-center justify-center gap-3"
+                                    >
+                                        <Bookmark size={16} /> Retirar Reserva
+                                    </button>
                                 </div>
                             )}
                         </div>
 
                         <div className="mt-auto pt-6 border-t border-white/5">
                             <button 
-                                onClick={() => navigate(`/history?vaga=${selectedVacancy.number}`)}
+                                onClick={() => navigate(`/reports?vaga=${selectedVacancy.number}`)}
                                 className="w-full py-3 bg-white/5 hover:bg-white/10 text-slate-400 font-bold text-[10px] uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2"
                             >
                                 <Info size={14} /> Ver Histórico da Vaga
@@ -789,7 +924,16 @@ const PortariaA = () => {
                                                     setSelectedEmployeeForEntry(null);
                                                     setManualSearchTerm('');
                                                     setEntrySpotSearch('');
+                                                    setSelectedVacancy(null);
                                                     
+                                                    // Registrar no Histórico
+                                                    addHistoryEntry({
+                                                        spot: matchedSpot.number,
+                                                        event: 'ENTRADA',
+                                                        owner: selectedEmployeeForEntry.name,
+                                                        plate: (mockVehicles.find(veh => veh.ownerId === selectedEmployeeForEntry.id))?.plate || 'S/ PLACA'
+                                                    });
+
                                                     // Mensagem de sucesso (poderia ser um Toast global)
                                                     alert(`Entrada registrada com sucesso na vaga ${matchedSpot.number}!`);
                                                 }}

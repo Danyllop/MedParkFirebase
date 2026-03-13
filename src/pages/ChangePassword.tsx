@@ -5,7 +5,7 @@ import { useAuth } from '../store/AuthContext';
 const ChangePassword = () => {
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
-    const { user, login } = useAuth();
+    const { user, token, login } = useAuth();
     const navigate = useNavigate();
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -16,8 +16,8 @@ const ChangePassword = () => {
         }
 
         // In a real app, call API here
-        if (user) {
-            login({ ...user }); // Refresh session or just proceed
+        if (user && token) {
+            login(token, { ...user }); // Refresh session or just proceed
         }
         
         localStorage.removeItem('medpark_require_password_change');

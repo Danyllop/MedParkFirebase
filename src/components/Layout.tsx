@@ -14,7 +14,7 @@ const Layout = () => {
         if (location.pathname === '/history') return 'Auditoria de Vagas';
         if (location.pathname === '/modules') return 'Módulos do Sistema';
         if (location.pathname === '/') return 'Dashboard Geral';
-        return 'MedPark SaaS';
+        return 'MedPark';
     };
 
     return (
