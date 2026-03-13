@@ -14,6 +14,7 @@ import GestaoPatio from './pages/GestaoPatio';
 import Infractions from './pages/Infractions';
 import Reports from './pages/Reports';
 import Users from './pages/Users';
+import ResetPassword from './pages/ResetPassword';
 import { ModuleProvider } from './store/ModuleContext';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -35,6 +36,7 @@ function App() {
         <Router>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/change-password" element={
               <ProtectedRoute>
                 <ChangePassword />

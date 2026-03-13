@@ -11,6 +11,14 @@ input:-webkit-autofill:active {
     transition: background-color 5000s ease-in-out 0s;
 }
 
+/* Fix for double eye icon in Edge/Chrome */
+input::-ms-reveal,
+input::-ms-clear,
+input::-webkit-contacts-auto-fill-button,
+input::-webkit-credentials-auto-fill-button {
+    display: none !important;
+}
+
 
 /**
  * Nota de Especialista: Em Tailwind 4, @import "tailwindcss" deve vir após 

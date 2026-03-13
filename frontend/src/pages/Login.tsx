@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../store/AuthContext';
 import api from '../services/api';
 
@@ -91,9 +91,9 @@ const Login = () => {
                         <div className="flex flex-col gap-2">
                             <div className="flex items-center justify-between">
                                 <label className="text-sm font-medium text-slate-300" htmlFor="password">Palavra-passe</label>
-                                <button type="button" className="text-xs font-medium text-accent hover:text-accent/80 transition-colors cursor-pointer">
+                                <Link to="/reset-password" type="button" className="text-xs font-medium text-accent hover:text-accent/80 transition-colors cursor-pointer">
                                     Esqueceu a senha?
-                                </button>
+                                </Link>
                             </div>
                             <div className="relative group">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500 group-focus-within:text-accent transition-colors">
