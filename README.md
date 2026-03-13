@@ -98,5 +98,4 @@ frontend/
 
 ## 👤 Autor
 **Danyllo Jonathas Cunha Pereira**  
-*Senior Fullstack Developer*  
 Data: 08/03/2026
