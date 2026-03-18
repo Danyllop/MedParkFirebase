@@ -15,6 +15,7 @@ import Infractions from './pages/Infractions';
 import Reports from './pages/Reports';
 import Users from './pages/Users';
 import ResetPassword from './pages/ResetPassword';
+import Support from './pages/Support';
 import { ModuleProvider } from './store/ModuleContext';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -59,6 +60,7 @@ function App() {
               <Route path="users" element={<Users />} />
               <Route path="infractions" element={<Infractions />} />
               <Route path="reports" element={<Reports />} />
+              <Route path="support" element={<Support />} />
             </Route>
           </Routes>
         </Router>

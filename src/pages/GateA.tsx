@@ -28,7 +28,7 @@ interface Vacancy {
     number: string;
     type: 'DIRETORIA' | 'COMUM' | 'PNE' | 'IDOSO';
     locality: 'EXTERNA' | 'SUBSOLO 1' | 'SUBSOLO 2';
-    status: 'LIVRE' | 'OCUPADA' | 'RESERVADA' | 'BLOQUEADA';
+    status: 'DISPONIVEL' | 'OCUPADA' | 'RESERVADA' | 'BLOQUEADA';
     owner?: string;
     vehicle?: string;
     plate?: string;
@@ -78,7 +78,7 @@ const PortariaA = () => {
                 number: `A-${num.toString().padStart(3, '0')}`,
                 type,
                 locality,
-                status: 'LIVRE'
+                status: 'DISPONIVEL'
             };
         });
         setVacancies(initialVacancies);
@@ -139,7 +139,7 @@ const PortariaA = () => {
     const handleReleaseSpot = (spot: Vacancy) => {
         const updatedVacancies = vacancies.map(v => 
             v.id === spot.id 
-                ? { ...v, status: 'LIVRE' as const, owner: undefined, vehicle: undefined, plate: undefined }
+                ? { ...v, status: 'DISPONIVEL' as const, owner: undefined, vehicle: undefined, plate: undefined }
                 : v
         );
         setVacancies(updatedVacancies);
@@ -158,7 +158,7 @@ const PortariaA = () => {
 
     const stats = useMemo(() => ({
         total: vacancies.length,
-        disponiveis: vacancies.filter(v => v.status === 'LIVRE' && !(v.type === 'DIRETORIA' && isBusinessHours)).length,
+        disponiveis: vacancies.filter(v => v.status === 'DISPONIVEL' && !(v.type === 'DIRETORIA' && isBusinessHours)).length,
         reservadas: vacancies.filter(v => v.status === 'RESERVADA').length,
         ocupadas: vacancies.filter(v => v.status === 'OCUPADA').length,
         restritas: vacancies.filter(v => v.type === 'DIRETORIA').length
@@ -184,7 +184,7 @@ const PortariaA = () => {
             return;
         }
         
-        if (!confirm('Tem certeza que deseja reiniciar o mapa? Todas as vagas voltarão ao status LIVRE.')) return;
+        if (!confirm('Tem certeza que deseja reiniciar o mapa? Todas as vagas voltarão ao status DISPONIVEL.')) return;
         generateSpots();
         setSelectedVacancy(null);
     };
@@ -193,7 +193,7 @@ const PortariaA = () => {
         if (spot.status === 'RESERVADA') {
             if (!confirm(`Deseja retirar a reserva da vaga ${spot.number} para ${spot.owner}?`)) return;
             const updatedVacancies = vacancies.map(v => 
-                v.id === spot.id ? { ...v, status: 'LIVRE' as const, owner: undefined } : v
+                v.id === spot.id ? { ...v, status: 'DISPONIVEL' as const, owner: undefined } : v
             );
             setVacancies(updatedVacancies);
             localStorage.setItem('gate_a_vacancies', JSON.stringify(updatedVacancies));
@@ -208,7 +208,7 @@ const PortariaA = () => {
             return;
         }
 
-        if (spot.status !== 'LIVRE') return;
+        if (spot.status !== 'DISPONIVEL') return;
         const owner = prompt("Motivo da reserva:");
         if (owner) {
             const updatedVacancies = vacancies.map(v => 
@@ -250,7 +250,7 @@ const PortariaA = () => {
         if (isBlocked) return "bg-slate-900/40 border-slate-800 text-slate-500 opacity-40 cursor-not-allowed";
         
         switch (vacancy.status) {
-            case 'LIVRE': return "bg-emerald-500/5 border-emerald-500/20 text-emerald-500 hover:border-emerald-500/40 hover:bg-emerald-500/10";
+            case 'DISPONIVEL': return "bg-emerald-500/5 border-emerald-500/20 text-emerald-500 hover:border-emerald-500/40 hover:bg-emerald-500/10";
             case 'OCUPADA': return "bg-rose-500/10 border-rose-500/20 text-rose-500 hover:border-rose-500/40";
             case 'RESERVADA': return "bg-amber-500/10 border-amber-500/20 text-amber-500 hover:border-amber-500/40";
             case 'BLOQUEADA': return "bg-slate-800 border-slate-700 text-slate-500 opacity-50";
@@ -260,7 +260,7 @@ const PortariaA = () => {
 
     const getStatusIcon = (status: Vacancy['status']) => {
         switch (status) {
-            case 'LIVRE': return <CheckCircle2 size={20} className="opacity-40" />;
+            case 'DISPONIVEL': return <CheckCircle2 size={20} className="opacity-40" />;
             case 'OCUPADA': return <Car size={20} className="fill-current" />;
             case 'RESERVADA': return <Bookmark size={20} className="fill-current" />;
             case 'BLOQUEADA': return <Ban size={20} />;
@@ -471,7 +471,7 @@ const PortariaA = () => {
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-3">
                                                     <div className={cn("size-2 rounded-full", 
-                                                        vacancy.status === 'LIVRE' ? "bg-emerald-500" : 
+                                                        vacancy.status === 'DISPONIVEL' ? "bg-emerald-500" : 
                                                         vacancy.status === 'OCUPADA' ? "bg-rose-500" : "bg-amber-500"
                                                     )}></div>
                                                     <span className="text-sm font-black text-white">{vacancy.number}</span>
@@ -486,41 +486,41 @@ const PortariaA = () => {
                                             <td className="px-6 py-4">
                                                 <span className={cn(
                                                     "px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border",
-                                                    vacancy.status === 'LIVRE' ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : 
+                                                    vacancy.status === 'DISPONIVEL' ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : 
                                                     vacancy.status === 'OCUPADA' ? "bg-rose-500/10 text-rose-500 border-rose-500/20" :
                                                     "bg-amber-500/10 text-amber-500 border-amber-500/20"
                                                 )}>
-                                                    {isBlocked ? 'BLOQUEADA' : (vacancy.status === 'LIVRE' ? 'DISPONÍVEL' : vacancy.status)}
+                                                    {isBlocked ? 'BLOQUEADA' : (vacancy.status === 'DISPONIVEL' ? 'DISPONIVEL' : vacancy.status)}
                                                 </span>
                                             </td>
                                             {canManageSpots && (
                                                 <td className="px-6 py-4 text-right">
                                                     <div className="flex items-center justify-end gap-2">
                                                         <button 
-                                                            disabled={vacancy.status !== 'LIVRE'}
+                                                            disabled={vacancy.status !== 'DISPONIVEL'}
                                                             onClick={(e) => { e.stopPropagation(); handleEditSpot(vacancy); }}
                                                             className={cn(
                                                                 "p-1.5 flex items-center justify-center rounded transition-colors",
-                                                                vacancy.status === 'LIVRE' 
+                                                                vacancy.status === 'DISPONIVEL' 
                                                                     ? "bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"
                                                                     : "bg-slate-800/50 text-slate-600 cursor-not-allowed"
                                                             )}
-                                                            title={vacancy.status === 'LIVRE' ? "Editar Vaga" : "Vaga não pode ser Editada"}
+                                                            title={vacancy.status === 'DISPONIVEL' ? "Editar Vaga" : "Vaga não pode ser Editada"}
                                                         >
                                                             <Edit size={14} />
                                                         </button>
                                                         <button 
-                                                            disabled={vacancy.status !== 'LIVRE' && vacancy.status !== 'RESERVADA'}
+                                                            disabled={vacancy.status !== 'DISPONIVEL' && vacancy.status !== 'RESERVADA'}
                                                             onClick={(e) => { e.stopPropagation(); handleReserveSpot(vacancy); }}
                                                             className={cn(
                                                                 "p-1.5 flex items-center justify-center rounded transition-colors",
-                                                                vacancy.status === 'LIVRE'
+                                                                vacancy.status === 'DISPONIVEL'
                                                                     ? "bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-amber-500"
                                                                     : vacancy.status === 'RESERVADA'
                                                                         ? "bg-amber-500/20 text-amber-500 hover:bg-amber-500/30"
                                                                         : "bg-slate-800/50 text-slate-600 cursor-not-allowed"
                                                             )}
-                                                            title={vacancy.status === 'LIVRE' ? "Reservar Vaga" : vacancy.status === 'RESERVADA' ? "Retirar Reserva" : "Vaga não pode ser Reservada"}
+                                                            title={vacancy.status === 'DISPONIVEL' ? "Reservar Vaga" : vacancy.status === 'RESERVADA' ? "Retirar Reserva" : "Vaga não pode ser Reservada"}
                                                         >
                                                             <Bookmark size={14} />
                                                         </button>
@@ -562,7 +562,7 @@ const PortariaA = () => {
                                     selectedVacancy.status === 'RESERVADA' ? "bg-amber-500 text-amber-500 border-amber-500/20" :
                                     "bg-emerald-500 text-emerald-500 border-emerald-500/20"
                                 )}>
-                                    Vaga {selectedVacancy.status === 'OCUPADA' ? 'Ocupada' : selectedVacancy.status === 'RESERVADA' ? 'Reservada' : 'Disponível'}
+                                    Vaga {selectedVacancy.status === 'OCUPADA' ? 'Ocupada' : selectedVacancy.status === 'RESERVADA' ? 'Reservada' : 'Disponivel'}
                                 </span>
                                 <h3 className="text-3xl font-black text-white tracking-tighter">{selectedVacancy.number}</h3>
                                 <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">
@@ -607,13 +607,13 @@ const PortariaA = () => {
                                         Liberar Vaga
                                     </button>
                                 </>
-                            ) : selectedVacancy.status === 'LIVRE' ? (
+                            ) : selectedVacancy.status === 'DISPONIVEL' ? (
                                 <div className="flex flex-col items-center justify-center py-10 text-center space-y-4">
                                     <div className="size-16 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500">
                                         <CheckCircle2 size={32} className="opacity-40" />
                                     </div>
                                     <div>
-                                        <p className="text-sm font-bold text-slate-300">Vaga Disponível</p>
+                                        <p className="text-sm font-bold text-slate-300">Vaga Disponivel</p>
                                         <p className="text-[10px] text-slate-500 mt-1 max-w-[200px]">Esta vaga está pronta para ser ocupada por um novo veículo.</p>
                                     </div>
                                     <button 
@@ -875,7 +875,7 @@ const PortariaA = () => {
                                                                             isSpotRestricted ? "text-amber-500" : (!isSpotOccupied ? "text-emerald-500" : "text-rose-500")
                                                                         )}>
                                                                             <span className="text-slate-500">STATUS:</span> 
-                                                                            {isSpotRestricted ? 'RESTRITA (DIRETORIA)' : (matchedSpot.status === 'LIVRE' ? 'DISPONÍVEL' : matchedSpot.status)}
+                                                                            {isSpotRestricted ? 'RESTRITA (DIRETORIA)' : (matchedSpot.status === 'DISPONIVEL' ? 'DISPONIVEL' : matchedSpot.status)}
                                                                         </p>
                                                                     </div>
                                                                 </div>

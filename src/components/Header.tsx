@@ -11,7 +11,7 @@ import {
 } from '../data/mockData';
 import { useNavigate } from 'react-router-dom';
 
-const Header = ({ title }: { title?: string }) => {
+const Header = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
@@ -99,7 +99,11 @@ const Header = ({ title }: { title?: string }) => {
 
     return (
         <header className="h-14 flex items-center justify-between px-6 border-b border-slate-800 bg-background-dark/80 backdrop-blur-md sticky top-0 z-50 shrink-0">
-            <h2 className="text-base font-bold tracking-tight text-slate-100">{title || 'MedPark SaaS'}</h2>
+            <div className="flex items-center select-none hover:opacity-80 transition-opacity cursor-default">
+                <span className="text-[10px] font-bold tracking-[0.2em] text-slate-500 uppercase mt-1 transition-colors hover:text-accent">
+                    Powered by LogicUp Solutions
+                </span>
+            </div>
 
             <div className="flex items-center gap-4">
                 <div ref={searchRef} className="relative hidden md:block">

@@ -167,7 +167,7 @@ enum VacancyType {
 }
 
 enum VacancyStatus {
-  LIVRE
+  DISPONIVEL
   OCUPADA
   RESERVADA
   BLOQUEADA
@@ -190,7 +190,7 @@ model Vacancy {
   number              String          // Ex: "A-001", "E-042"
   type                VacancyType     @default(COMUM)
   locality            VacancyLocality @default(EXTERNA)
-  currentStatus       VacancyStatus   @default(LIVRE) @map("current_status")
+  currentStatus       VacancyStatus   @default(DISPONIVEL) @map("current_status")
   occupantName        String?         @map("occupant_name")
   occupantPlate       String?         @map("occupant_plate")
   occupantVehicle     String?         @map("occupant_vehicle")

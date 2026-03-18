@@ -158,7 +158,7 @@ const CreateVacancyModal: React.FC<CreateVacancyModalProps> = ({ isOpen, onClose
                     <div className="space-y-1.5 pt-2">
                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Status Inicial</label>
                         <div className="w-full h-11 px-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 rounded-xl flex items-center text-xs font-black uppercase tracking-widest cursor-not-allowed opacity-80">
-                            DISPONÍVEL (LIVRE)
+                            DISPONIVEL (DISPONIVEL)
                         </div>
                     </div>
                 </div>

@@ -99,11 +99,11 @@ const EditVacancyModal = ({ isOpen, onClose, vacancy, onUpdate }: EditVacancyMod
                         <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Status Atual</p>
                         <span className={cn(
                             "px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-tighter",
-                            vacancy.status === 'LIVRE' ? "bg-emerald-500/10 text-emerald-500" :
+                            vacancy.status === 'DISPONIVEL' ? "bg-emerald-500/10 text-emerald-500" :
                             vacancy.status === 'OCUPADA' ? "bg-rose-500/10 text-rose-500" :
                             "bg-amber-500/10 text-amber-500"
                         )}>
-                            {vacancy.status === 'LIVRE' ? 'DISPONÍVEL' : vacancy.status}
+                            {vacancy.status === 'DISPONIVEL' ? 'DISPONIVEL' : vacancy.status}
                         </span>
                     </div>
                 </div>

@@ -109,9 +109,9 @@ router.patch('/:id/status', async (req, res) => {
       where: { id },
       data: {
         currentStatus,
-        occupantName: currentStatus === 'LIVRE' ? null : occupantName,
-        occupantPlate: currentStatus === 'LIVRE' ? null : occupantPlate,
-        occupantVehicle: currentStatus === 'LIVRE' ? null : occupantVehicle,
+        occupantName: currentStatus === 'DISPONIVEL' ? null : occupantName,
+        occupantPlate: currentStatus === 'DISPONIVEL' ? null : occupantPlate,
+        occupantVehicle: currentStatus === 'DISPONIVEL' ? null : occupantVehicle,
       },
     });
 
@@ -147,7 +147,7 @@ router.delete('/:id', requireRole('ADMIN'), async (req, res) => {
       return;
     }
 
-    if (vacancy.currentStatus !== 'LIVRE') {
+    if (vacancy.currentStatus !== 'DISPONIVEL') {
       res.status(400).json({ error: 'Não é possível excluir uma vaga ocupada ou reservada.' });
       return;
     }
@@ -176,7 +176,7 @@ router.patch('/:id/reserve', async (req: AuthRequest, res) => {
       return;
     }
 
-    const newStatus = vacancy.currentStatus === 'RESERVADA' ? 'LIVRE' : 'RESERVADA';
+    const newStatus = vacancy.currentStatus === 'RESERVADA' ? 'DISPONIVEL' : 'RESERVADA';
     
     const updated = await (prisma.vacancy as any).update({
       where: { id: id },

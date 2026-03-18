@@ -30,6 +30,7 @@ const Reports = () => {
     const [dateEnd, setDateEnd] = useState('');
     const [unitFilter, setUnitFilter] = useState('Todos');
     const [typeFilter, setTypeFilter] = useState('Todos');
+    const [searchTerm, setSearchTerm] = useState('');
 
     // Consolidate logs from localStorage
     const getLogs = () => {
@@ -51,71 +52,84 @@ const Reports = () => {
         return allLogs.sort((a, b) => b.id - a.id);
     };
 
+    // Fix time formatting from '15:1' to '15:10'
+    const formatTimestamp = (ts: string) => {
+        if (!ts) return '';
+        const parts = ts.split(' ');
+        if (parts.length === 2) {
+            const [datePart, timePart] = parts;
+            const timeParts = timePart.split(':');
+            if (timeParts.length === 2) {
+                const h = timeParts[0].padStart(2, '0');
+                const m = timeParts[1].padStart(2, '0');
+                return `${datePart} ${h}:${m}`;
+            }
+        }
+        return ts;
+    };
+
     const displayLogs = getLogs().map(log => ({
         id: log.id,
-        date: log.timestamp,
+        date: formatTimestamp(log.timestamp),
         name: log.owner || 'SISTEMA',
-        type: log.event, // Using event as type for visual feedback
-        vehicle: `${log.plate || 'S/ PLACA'}`,
+        userType: log.type || (log.owner === 'SISTEMA' ? 'SISTEMA' : 'DESCONHECIDO'), 
+        event: log.event,
+        vehicle: log.plate || 'S/ PLACA',
         destination: log.source,
         isCheckIn: log.event === 'ENTRADA',
         operator: log.operator
     }));
 
     const columns = [
-        { header: 'DATA / HORA', accessor: 'date', className: () => 'text-xs text-slate-300' },
+        { header: 'DATA/HORA', accessor: 'date', className: () => 'text-xs text-slate-300 font-mono' },
         { 
-            header: 'NOME', 
-            accessor: 'name', 
-            className: () => 'font-bold text-white text-xs',
+            header: 'EVENTO', 
+            accessor: 'event',
             render: (doc: any) => (
-                <div className="max-w-[150px] whitespace-normal">
-                    {doc.name}
+                <div className="flex items-center gap-2">
+                    {doc.isCheckIn ? (
+                        <LogIn size={14} className="text-emerald-500" />
+                    ) : (
+                        <LogOut size={14} className="text-rose-500" />
+                    )}
+                    <span className={cn(
+                        "text-[10px] font-bold uppercase tracking-wider",
+                        doc.isCheckIn ? "text-emerald-500" : "text-rose-500"
+                    )}>
+                        {doc.event}
+                    </span>
                 </div>
             )
         },
         { 
-            header: 'TIPO', 
-            accessor: 'type',
+            header: 'PESSOA / VÍNCULO', 
+            accessor: 'name', 
+            className: () => 'text-xs',
             render: (doc: any) => (
-                <span className={cn(
-                    "text-[9px] font-black px-2 py-0.5 rounded border uppercase tracking-wider",
-                    doc.type === 'FUNCIONÁRIO' ? "bg-accent/10 text-accent border-accent/20" :
-                    doc.type === 'PRESTADOR' ? "bg-amber-500/10 text-amber-500 border-amber-500/20" :
-                    "bg-slate-500/10 text-slate-400 border-slate-500/20"
-                )}>
-                    {doc.type}
+                <div className="flex flex-col">
+                    <span className="font-bold text-white max-w-[180px] truncate">{doc.name}</span>
+                    <span className={cn(
+                        "text-[9px] font-black px-1.5 py-0.5 rounded w-max mt-1 uppercase tracking-wider",
+                        doc.userType === 'FUNCIONÁRIO' ? "bg-accent/10 text-accent" :
+                        doc.userType === 'PRESTADOR' ? "bg-amber-500/10 text-amber-500" :
+                        "bg-slate-500/10 text-slate-400"
+                    )}>
+                        {doc.userType}
+                    </span>
+                </div>
+            )
+        },
+        { 
+            header: 'VEÍCULO', 
+            accessor: 'vehicle',
+            render: (doc: any) => (
+                <span className="font-mono font-bold text-slate-200 text-xs bg-slate-800 px-2 py-1 rounded border border-white/5">
+                    {doc.vehicle}
                 </span>
             )
         },
-        { 
-            header: 'VEÍCULO / PLACA', 
-            accessor: 'vehicle',
-            render: (doc: any) => {
-                const parts = doc.vehicle.split(' - ');
-                return (
-                    <div className="flex flex-col text-xs">
-                        <span className="text-slate-400 text-[10px]">{parts[0]}</span>
-                        <span className="font-mono font-bold text-slate-200">{parts[1] || ''}</span>
-                    </div>
-                );
-            }
-        },
-        { header: 'DESTINO', accessor: 'destination', className: () => 'text-xs text-slate-400' },
-        { 
-            header: 'ENTRADA/SAÍDA', 
-            accessor: 'isCheckIn',
-            render: (doc: any) => (
-                <div className="flex items-center justify-center">
-                    {doc.isCheckIn ? (
-                        <span title="Entrada"><LogIn size={16} className="text-emerald-500" /></span>
-                    ) : (
-                        <span title="Saída"><LogOut size={16} className="text-rose-500" /></span>
-                    )}
-                </div>
-            )
-        },
-        { header: 'OPERADOR', accessor: 'operator', className: () => 'text-xs text-slate-300' },
+        { header: 'PORTARIA', accessor: 'destination', className: () => 'text-xs text-slate-400 font-bold' },
+        { header: 'OPERADOR', accessor: 'operator', className: () => 'text-[10px] text-slate-500 uppercase tracking-wider' },
     ];
 
     return (
@@ -186,7 +200,7 @@ const Reports = () => {
                             <label className="text-[10px] uppercase font-bold text-slate-500">DATA INÍCIO</label>
                             <input 
                                 type="date" 
-                                className="input-field w-full text-xs"
+                                className="input-field w-full text-xs [color-scheme:dark]"
                                 value={dateStart}
                                 onChange={(e) => setDateStart(e.target.value)}
                             />
@@ -195,7 +209,7 @@ const Reports = () => {
                             <label className="text-[10px] uppercase font-bold text-slate-500">DATA FIM</label>
                             <input 
                                 type="date" 
-                                className="input-field w-full text-xs"
+                                className="input-field w-full text-xs [color-scheme:dark]"
                                 value={dateEnd}
                                 onChange={(e) => setDateEnd(e.target.value)}
                             />
@@ -235,20 +249,48 @@ const Reports = () => {
 
                 {/* Logs Table Area */}
                 <div className="flex-1 min-h-0 bg-slate-900/40 rounded-xl border border-white/5 flex flex-col overflow-hidden">
-                    <div className="p-4 border-b border-white/5 flex justify-between items-center bg-background-dark/30">
-                        <h2 className="text-sm font-bold text-white">Logs de Acessos Recentes</h2>
-                        <div className="flex gap-2">
-                            <button className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-white/10 px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2">
-                                <FileText size={14} /> Exportar PDF
+                    <div className="p-4 border-b border-white/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-background-dark/30">
+                        <div className="flex items-center gap-4">
+                            <h2 className="text-sm font-bold text-white">Logs de Acessos Recentes</h2>
+                            <div className="relative w-48 hidden sm:block">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
+                                <input
+                                    type="text"
+                                    placeholder="Pesquisar..."
+                                    className="bg-slate-900/50 border border-white/10 text-white text-xs rounded-lg pl-9 pr-3 py-1.5 w-full focus:outline-none focus:border-accent/50 transition-colors"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <div className="flex gap-2 w-full sm:w-auto">
+                            <div className="relative flex-1 sm:hidden">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
+                                <input
+                                    type="text"
+                                    placeholder="Pesquisar..."
+                                    className="bg-slate-900/50 border border-white/10 text-white text-xs rounded-lg pl-9 pr-3 py-1.5 w-full focus:outline-none focus:border-accent/50 transition-colors"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                            <button className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-white/10 px-4 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2">
+                                <FileText size={14} /> <span className="hidden sm:inline">Exportar PDF</span>
                             </button>
-                            <button className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-white/10 px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2">
-                                <Download size={14} /> Exportar Excel
+                            <button className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-white/10 px-4 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2">
+                                <Download size={14} /> <span className="hidden sm:inline">Exportar Excel</span>
                             </button>
                         </div>
                     </div>
                     
-                    <div className="flex-1 overflow-auto no-scrollbar">
-                        <DataTable title="Logs de Acessos Recentes" columns={columns as any} data={displayLogs} />
+                    <div className="flex-1 overflow-auto no-scrollbar pb-10">
+                        <DataTable 
+                            title="" 
+                            hideHeader={true} 
+                            searchTerm={searchTerm} 
+                            columns={columns as any} 
+                            data={displayLogs} 
+                        />
                     </div>
                 </div>
 

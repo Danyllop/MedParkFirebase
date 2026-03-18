@@ -14,6 +14,7 @@ import {
 import { useModules } from '../store/ModuleContext';
 import { cn } from '../lib/utils';
 import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
 import api from '../services/api';
 
 const StatCard = ({ title, value, percentage, icon: Icon, color, trend, subtitle }: any) => (
@@ -117,7 +118,7 @@ const Dashboard = () => {
                         api.get('/access/history?limit=5'),
                     ]);
                     all = allRes.data || [];
-                    history = logsRes.data?.logs ?? logsRes.data ?? [];
+                    history = logsRes.data?.data ?? logsRes.data?.logs ?? [];
                 } catch (apiError) {
                     console.warn('API indisponível, usando fallback para localStorage');
                 }
@@ -129,17 +130,17 @@ const Dashboard = () => {
 
                 // Se as páginas de portaria nunca foram visitadas, inicializamos com as contagens padrão
                 if (localA.length === 0 && all.length === 0) {
-                    localA = Array.from({ length: 90 }, (_, i) => ({ id: i + 1, status: 'LIVRE' }));
+                    localA = Array.from({ length: 90 }, (_, i) => ({ id: i + 1, status: 'DISPONIVEL' }));
                 }
                 if (localE.length === 0 && all.length === 0) {
-                    localE = Array.from({ length: 200 }, (_, i) => ({ id: i + 1, status: 'LIVRE' }));
+                    localE = Array.from({ length: 200 }, (_, i) => ({ id: i + 1, status: 'DISPONIVEL' }));
                 }
 
                 // Se a API falhar ou retornar menos dados que o esperado, usamos os locais
                 if (all.length === 0) {
                     // Mapear campos do localStorage para o formato esperado pelo Dashboard
-                    const mappedA = localA.map((v: any) => ({ ...v, gate: 'A', currentStatus: v.status || 'LIVRE' }));
-                    const mappedE = localE.map((v: any) => ({ ...v, gate: 'E', currentStatus: v.status || 'LIVRE' }));
+                    const mappedA = localA.map((v: any) => ({ ...v, gate: 'A', currentStatus: v.status || 'DISPONIVEL' }));
+                    const mappedE = localE.map((v: any) => ({ ...v, gate: 'E', currentStatus: v.status || 'DISPONIVEL' }));
                     all = [...mappedA, ...mappedE];
                 }
 
@@ -153,10 +154,15 @@ const Dashboard = () => {
                 const totalA = gateA.length;
                 const totalE = gateE.length;
                 const total = all.length;
-                const available = all.filter((v: any) => v.currentStatus === 'LIVRE').length;
-                const occupiedA = gateA.filter((v: any) => v.currentStatus !== 'LIVRE').length;
-                const occupiedE = gateE.filter((v: any) => v.currentStatus !== 'LIVRE').length;
-                const totalOccupied = all.filter((v: any) => v.currentStatus !== 'LIVRE').length;
+                
+                // Precisamos considerar apenas as vagas que estão explicitamente DISPONIVEL.
+                // Vagas restritas para a DIRETORIA não entram na contagem de "disponíveis"
+                const available = all.filter((v: any) => v.currentStatus === 'DISPONIVEL' && v.type !== 'DIRETORIA').length;
+                
+                // Vagas ocupadas são todas as não-DISPONIVELS (ou as da diretoria que já estão permanentemente restritas)
+                let occupiedA = gateA.filter((v: any) => v.currentStatus !== 'DISPONIVEL' || v.type === 'DIRETORIA').length;
+                let occupiedE = gateE.filter((v: any) => v.currentStatus !== 'DISPONIVEL' || v.type === 'DIRETORIA').length;
+                const totalOccupied = total - available;
 
                 setStats({
                     totalVacancies: total,
@@ -290,7 +296,7 @@ const Dashboard = () => {
                             ))}
                         </div>
                         <div className="p-3 border-t border-white/5 text-center">
-                            <button className="text-[10px] font-bold text-accent hover:underline uppercase tracking-tight">Ver log completo</button>
+                            <Link to="/gestao-patio" className="text-[10px] font-bold text-accent hover:underline uppercase tracking-tight">Ver log completo</Link>
                         </div>
                     </div>
                 </div>

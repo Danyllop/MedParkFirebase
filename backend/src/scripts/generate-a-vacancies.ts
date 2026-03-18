@@ -36,7 +36,7 @@ async function main() {
             number,
             type,
             locality,
-            currentStatus: 'LIVRE'
+            currentStatus: 'DISPONIVEL'
         });
     }
 

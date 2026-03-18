@@ -126,7 +126,7 @@ router.post('/exit', async (req: AuthRequest, res) => {
       await prisma.vacancy.update({
         where: { id: vacancyId },
         data: {
-          currentStatus: 'LIVRE',
+          currentStatus: 'DISPONIVEL',
           occupantName: null,
           occupantPlate: null,
           occupantVehicle: null,
