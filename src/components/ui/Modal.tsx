@@ -47,7 +47,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, maxWidt
                             maxWidth
                         )}
                     >
-                        <div className="flex items-center justify-between p-6 border-b border-white/5">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
                             <h3 className="text-xl font-bold">{title}</h3>
                             <button
                                 onClick={onClose}
@@ -57,7 +57,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, maxWidt
                             </button>
                         </div>
 
-                        <div className="p-6 max-h-[calc(100vh-120px)] overflow-y-auto custom-scrollbar">
+                        <div className="p-5 sm:p-6 max-h-[calc(100vh-120px)] overflow-y-auto custom-scrollbar">
                             {children}
                         </div>
                     </motion.div>

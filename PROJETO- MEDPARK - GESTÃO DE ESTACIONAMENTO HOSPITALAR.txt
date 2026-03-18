@@ -43,7 +43,7 @@ DATA: 08/03/2026
 
 5. MÓDULO OPERACIONAL: PORTARIA E (GERAL / ALMOXARIFADO)
 --------------------------------------------------------------------------------
-- Capacidade: 260 Vagas totais.
+- Capacidade: 200 Vagas totais.
 - Destino Especial: Opção de fluxo específico para o Almoxarifado.
 - Regra de Fluxo: Prestadores devem comprovar serviço/entrega para acesso.
 - Cadastro Temporário: Operadores registram novatos por até 30 dias.

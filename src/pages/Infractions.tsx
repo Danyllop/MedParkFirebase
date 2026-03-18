@@ -1,26 +1,9 @@
 import { useState } from 'react';
-import {
-    Gavel,
-    Plus,
-    Search,
-    Eye,
-    Edit2,
-    TrendingUp,
-    AlertCircle,
-    MapPin
-} from 'lucide-react';
+import { Trash2, Gavel, Plus, Search, Edit2, AlertCircle, MapPin, FileText } from 'lucide-react';
 import { cn } from '../lib/utils';
 import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
 import InfractionForm from '../components/forms/InfractionForm';
-
-// Mock data to be moved later
-const mockInfractions = [
-    { id: 1, date: '2023-10-14T14:25:00', plate: 'ABC-1234', type: 'Vaga Reservada (Deficiente)', location: 'Bloco A - Portaria Principal', severity: 'GRAVE' },
-    { id: 2, date: '2023-10-14T12:10:00', plate: 'XYZ-9876', type: 'Estacionamento Irregular', location: 'Bloco E - Subsolo 1', severity: 'MÉDIA' },
-    { id: 3, date: '2023-10-14T09:45:00', plate: 'JKL-5566', type: 'Excesso de Velocidade', location: 'Acesso Principal', severity: 'LEVE' },
-    { id: 4, date: '2023-10-13T22:30:00', plate: 'MHQ-2290', type: 'Obstrução de Via', location: 'Bloco B - Emergência', severity: 'GRAVE' },
-];
 
 const StatCard = ({ title, value, subtitle, trend, type }: any) => (
     <div className="glass-card p-5 rounded-xl border border-white/5 bg-slate-900/40 relative overflow-hidden group">
@@ -28,12 +11,13 @@ const StatCard = ({ title, value, subtitle, trend, type }: any) => (
             <h3 className="text-slate-400 text-xs font-semibold">{title}</h3>
             {trend && (
                 <span className={cn(
-                    "text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1",
+                    "text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 leading-none",
                     type === 'success' ? "bg-emerald-500/10 text-emerald-500" :
                     type === 'warning' ? "bg-amber-500/10 text-amber-500" :
+                    type === 'info' ? "bg-accent/10 text-accent" :
+                    type === 'primary' ? "bg-slate-500/10 text-slate-400" :
                     "bg-rose-500/10 text-rose-500"
                 )}>
-                    {type === 'success' ? <TrendingUp size={12} /> : null}
                     {trend}
                 </span>
             )}
@@ -51,32 +35,84 @@ const StatCard = ({ title, value, subtitle, trend, type }: any) => (
 const Infractions = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedDescription, setSelectedDescription] = useState<string | null>(null);
+    const [infractions, setInfractions] = useState<any[]>([]);
+
+    const totalInfractions = infractions.length;
+    const currentMonthInfractions = infractions.filter(i => {
+        const itemDate = new Date(i.date);
+        const now = new Date();
+        return itemDate.getMonth() === now.getMonth() && itemDate.getFullYear() === now.getFullYear();
+    }).length;
+    const leves = infractions.filter(i => i.severity === 'LEVE').length;
+    const medias = infractions.filter(i => i.severity === 'MÉDIA').length;
+    const graves = infractions.filter(i => i.severity === 'GRAVE').length;
+
+    const getPercentage = (count: number) => {
+        if (totalInfractions === 0) return '0%';
+        return Math.round((count / totalInfractions) * 100) + '%';
+    };
+
+    const handleDelete = (id: number) => {
+        if (window.confirm("Tem certeza que deseja deletar esta infração?")) {
+            setInfractions(prev => prev.filter(inf => inf.id !== id));
+        }
+    };
 
     const columns = [
         {
-            header: 'DATA/HORA',
-            accessor: 'date',
-            render: (doc: any) => {
+            header: 'DATA',
+            accessor: (doc: any) => {
                 const date = new Date(doc.date);
+                if (isNaN(date.getTime())) return <span className="text-slate-500">-</span>;
                 return (
-                    <div className="flex flex-col text-[11px] font-medium leading-tight text-slate-300">
-                        <span className="font-bold text-white">{date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-                        <span className="text-slate-500">{date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
-                    </div>
+                    <span className="font-bold text-white text-[11px] uppercase">
+                        {date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                    </span>
+                );
+            }
+        },
+        {
+            header: 'HORA',
+            accessor: (doc: any) => {
+                const timeStr = doc.time || '';
+                return (
+                    <span className="text-slate-400 font-mono text-[11px]">
+                        {timeStr}
+                    </span>
                 );
             }
         },
         { 
-            header: 'PLACA', 
-            accessor: 'plate',
-            className: () => 'font-mono font-bold text-accent tracking-wider'
+            header: 'INFRATOR', 
+            accessor: (doc: any) => (
+                <div className="flex flex-col">
+                    <span className="font-bold text-white uppercase">{doc.name || 'NÃO IDENTIFICADO'}</span>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase">{doc.role || '-'}</span>
+                </div>
+            )
         },
-        { header: 'TIPO DE INFRAÇÃO', accessor: 'type', className: () => 'font-medium text-slate-300' },
-        { header: 'LOCAL', accessor: 'location', className: () => 'text-slate-400 text-xs' },
+        { 
+            header: 'PLACA', 
+            accessor: (doc: any) => (
+                <span className="font-mono font-bold text-accent tracking-wider">{doc.plate}</span>
+            )
+        },
+        { 
+            header: 'TIPO DE INFRAÇÃO', 
+            accessor: (doc: any) => (
+                <span className="font-medium text-slate-300">{doc.type}</span>
+            )
+        },
+        { 
+            header: 'LOCAL', 
+            accessor: (doc: any) => (
+                <span className="text-slate-400 text-xs">{doc.location}</span>
+            )
+        },
         {
             header: 'GRAVIDADE',
-            accessor: 'severity',
-            render: (doc: any) => (
+            accessor: (doc: any) => (
                 <span className={cn(
                     "text-[9px] font-black px-2 py-1 rounded border uppercase tracking-wider",
                     doc.severity === 'GRAVE' ? "bg-rose-500/10 text-rose-500 border-rose-500/20" :
@@ -89,24 +125,31 @@ const Infractions = () => {
         },
         {
             header: 'AÇÕES',
-            accessor: 'id',
-            render: () => (
+            accessor: (doc: any) => (
                 <div className="flex items-center gap-2">
-                    <button className="p-1.5 bg-white/5 hover:bg-white/10 rounded-md text-slate-400 hover:text-white transition-colors">
-                        <Eye size={14} />
+                    <button 
+                        onClick={() => setSelectedDescription(doc.description)}
+                        className="p-1.5 bg-blue-500/10 hover:bg-blue-500/20 rounded-md text-blue-500 transition-colors" title="Ver Detalhes">
+                        <FileText size={14} />
                     </button>
-                    <button className="p-1.5 bg-white/5 hover:bg-white/10 rounded-md text-slate-400 hover:text-accent transition-colors">
+                    <button className="p-1.5 bg-accent/10 hover:bg-accent/20 rounded-md text-accent transition-colors" title="Editar">
                         <Edit2 size={14} />
+                    </button>
+                    <button 
+                         onClick={() => handleDelete(doc.id)} 
+                         className="p-1.5 bg-rose-500/10 hover:bg-rose-500/20 rounded-md text-rose-500 transition-colors" title="Deletar">
+                        <Trash2 size={14} />
                     </button>
                 </div>
             )
         }
     ];
 
-    const filteredData = mockInfractions.filter(item => 
-        item.plate.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        item.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.location.toLowerCase().includes(searchTerm.toLowerCase())
+    const filteredData = infractions.filter(item => 
+        (item.name && item.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (item.plate && item.plate.toLowerCase().includes(searchTerm.toLowerCase())) || 
+        (item.type && item.type.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (item.location && item.location.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
     return (
@@ -138,27 +181,41 @@ const Infractions = () => {
                 </div>
 
                 {/* Dashboard Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                     <StatCard 
-                        title="Total de Infrações (Mês)" 
-                        value="142" 
-                        trend="~ 12%" 
+                        title="Total" 
+                        value={totalInfractions} 
+                        trend="" 
+                        type="primary"
+                        subtitle="Histórico Completo" 
+                    />
+                    <StatCard 
+                        title="Mês Atual" 
+                        value={currentMonthInfractions} 
+                        trend={getPercentage(currentMonthInfractions)} 
+                        type="info"
+                        subtitle="Neste Mês" 
+                    />
+                    <StatCard 
+                        title="Leves" 
+                        value={leves} 
+                        trend={getPercentage(leves)} 
                         type="success"
-                        subtitle="Em comparação com 126 no mês passado" 
+                        subtitle="Advertências" 
                     />
                     <StatCard 
-                        title="Pendentes de Resolução" 
-                        value="28" 
-                        trend="~ 5%" 
+                        title="Médias" 
+                        value={medias} 
+                        trend={getPercentage(medias)} 
                         type="warning"
-                        subtitle="Aguardando revisão do administrador" 
+                        subtitle="Estacionamento Irregular" 
                     />
                     <StatCard 
-                        title="Área Crítica" 
-                        value="Vaga Reservada" 
-                        trend="CRÍTICO" 
+                        title="Graves" 
+                        value={graves} 
+                        trend={getPercentage(graves)} 
                         type="danger"
-                        subtitle="Bloco B (Emergência) com maior volume" 
+                        subtitle="Bloqueio Imediato" 
                     />
                 </div>
 
@@ -168,7 +225,7 @@ const Infractions = () => {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-accent transition-colors" size={16} />
                         <input
                             type="text"
-                            placeholder="Buscar por placa ou descrição..."
+                            placeholder="Buscar por nome, placa ou local..."
                             className="bg-slate-800/40 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-xs w-full focus:outline-none focus:border-accent/40 focus:bg-slate-800/60 transition-all text-white placeholder:text-slate-500 font-medium"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -179,10 +236,10 @@ const Infractions = () => {
                 {/* Data Table */}
                 <div className="flex-1 min-h-0 bg-slate-900/40 rounded-xl border border-white/5 overflow-hidden flex flex-col">
                     <div className="flex-1 overflow-auto no-scrollbar">
-                        <DataTable title="Registro de Infrações" columns={columns as any} data={filteredData} />
+                        <DataTable title="Registro de Infrações" columns={columns as any} data={filteredData} hideHeader={true} />
                     </div>
                     <div className="p-3 border-t border-white/5 text-xs text-slate-500 bg-background-dark/50 flex justify-between items-center">
-                        <span>Mostrando 1-{filteredData.length} de 142 infrações</span>
+                        <span>Mostrando {filteredData.length > 0 ? '1' : '0'}-{filteredData.length} de {totalInfractions} infrações</span>
                         {/* Pagination placeholder if needed */}
                     </div>
                 </div>
@@ -192,10 +249,36 @@ const Infractions = () => {
                 <InfractionForm 
                     onCancel={() => setIsModalOpen(false)} 
                     onSubmit={(data) => {
-                        console.log('Nova infração:', data);
+                        const newInfraction = {
+                            id: Date.now(),
+                            date: data.date, 
+                            time: data.time,
+                            name: data.vehicle.owner || data.vehicle.ownerName,
+                            role: data.vehicle.role,
+                            plate: data.vehicle.plate,
+                            type: data.type,
+                            description: data.description,
+                            location: data.location || (data.gate === 'A' ? 'Portaria A' : 'Portaria E'),
+                            severity: data.severity,
+                        };
+                        setInfractions(prev => [newInfraction, ...prev]);
                         setIsModalOpen(false);
                     }} 
                 />
+            </Modal>
+
+            <Modal isOpen={!!selectedDescription} onClose={() => setSelectedDescription(null)} title="Detalhes da Infração">
+                <div className="p-4 bg-slate-800/50 rounded-lg text-slate-300 whitespace-pre-wrap text-sm border border-white/5">
+                    {selectedDescription || "Nenhuma descrição fornecida para esta infração."}
+                </div>
+                <div className="flex justify-end mt-6">
+                    <button 
+                        onClick={() => setSelectedDescription(null)}
+                        className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-bold transition-colors"
+                    >
+                        FECHAR
+                    </button>
+                </div>
             </Modal>
         </div>
     );

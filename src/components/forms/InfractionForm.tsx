@@ -7,19 +7,37 @@ interface InfractionFormProps {
     onSubmit: (data: any) => void;
 }
 
-const mockVehicleDB = [
-    { plate: 'ABC-1234', owner: 'Carlos Eduardo', role: 'Médico Titular', model: 'Toyota Corolla', color: 'Prata', type: 'FUNCIONÁRIO' },
-    { plate: 'XYZ-9876', owner: 'Empresa Manutenção X', role: 'Terceiro', model: 'Fiat Fiorino', color: 'Branco', type: 'PRESTADOR' },
-    { plate: 'JKL-5566', owner: 'Amanda Oliveira', role: 'Enfermeira', model: 'Jeep Compass', color: 'Preto', type: 'FUNCIONÁRIO' }
+import { mockVehicles, mockEmployees, mockProviderVehicles, mockProvidersList } from '../../data/mockData';
+
+const unifiedVehicleDB = [
+    ...mockVehicles.map(v => {
+        const emp = mockEmployees.find(e => e.id === v.ownerId);
+        return {
+            plate: v.plate,
+            owner: v.owner,
+            role: emp?.role || 'FUNCIONÁRIO',
+            model: v.model,
+            color: v.color,
+            type: 'FUNCIONÁRIO'
+        };
+    }),
+    ...mockProviderVehicles.map(v => {
+        const prov = mockProvidersList.find(p => p.id === v.providerId);
+        return {
+            plate: v.plate,
+            owner: v.ownerName,
+            role: prov?.role || 'PRESTADOR',
+            model: v.model,
+            color: v.color,
+            type: 'PRESTADOR'
+        };
+    })
 ];
 
-const LOCATIONS = [
-    'Bloco A - Portaria Principal',
-    'Bloco B - Emergência',
-    'Bloco E - Subsolo 1',
-    'Estacionamento Médico',
-    'Acesso Principal'
-];
+const GATE_LOCATIONS: Record<string, string[]> = {
+    'A': ['Externa', 'Subsolo 1', 'Subsolo 2'],
+    'E': ['Área 1', 'Área 2', 'Área 3', 'Área 4', 'Área 5', 'Doca de Carga e Descarga']
+};
 
 const INFRACTION_TYPES = [
     'Vaga Reservada (Deficiente)',
@@ -34,10 +52,13 @@ const INFRACTION_TYPES = [
 
 const InfractionForm: React.FC<InfractionFormProps> = ({ onCancel, onSubmit }) => {
     const [searchTerm, setSearchTerm] = useState('');
-    const [searchResults, setSearchResults] = useState<typeof mockVehicleDB>([]);
+    const [searchResults, setSearchResults] = useState<typeof unifiedVehicleDB>([]);
     const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
 
     const [formData, setFormData] = useState({
+        gate: '', // 'A' | 'E'
+        date: new Date().toISOString().split('T')[0],
+        time: new Date().toTimeString().slice(0, 5),
         type: '',
         location: '',
         severity: 'MÉDIA' as 'LEVE' | 'MÉDIA' | 'GRAVE',
@@ -49,7 +70,7 @@ const InfractionForm: React.FC<InfractionFormProps> = ({ onCancel, onSubmit }) =
     const handleSearch = (term: string) => {
         setSearchTerm(term);
         if (term.length >= 3) {
-            const results = mockVehicleDB.filter(v => 
+            const results = unifiedVehicleDB.filter(v => 
                 v.plate.toLowerCase().includes(term.toLowerCase()) || 
                 v.owner.toLowerCase().includes(term.toLowerCase())
             );
@@ -70,6 +91,9 @@ const InfractionForm: React.FC<InfractionFormProps> = ({ onCancel, onSubmit }) =
         
         const newErrors: Record<string, string> = {};
         if (!selectedVehicle) newErrors.vehicle = 'Selecione um veículo/infrator';
+        if (!formData.gate) newErrors.gate = 'Selecione a portaria';
+        if (!formData.date) newErrors.date = 'Selecione a data';
+        if (!formData.time) newErrors.time = 'Selecione a hora';
         if (!formData.type) newErrors.type = 'Selecione o tipo de infração';
         if (!formData.location) newErrors.location = 'Selecione a localização';
         if (!formData.description.trim()) newErrors.description = 'A descrição é obrigatória';
@@ -79,16 +103,19 @@ const InfractionForm: React.FC<InfractionFormProps> = ({ onCancel, onSubmit }) =
             return;
         }
 
+        // Make an ISO date string from 'date' and 'time'
+        const combinedDateTime = new Date(`${formData.date}T${formData.time}:00`).toISOString();
+
         onSubmit({
             ...formData,
             vehicle: selectedVehicle,
-            date: new Date().toISOString()
+            date: combinedDateTime
         });
     };
 
     return (
-        <form onSubmit={handleSubmit} className="flex flex-col h-[70vh] max-h-[600px]">
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 form-scrollbar">
+        <form onSubmit={handleSubmit} className="flex flex-col">
+            <div className="flex-1 pt-2 space-y-3 pb-2">
                 
                 {/* 1. Vehicle Selection (Search) */}
                 <div className="space-y-3">
@@ -143,25 +170,89 @@ const InfractionForm: React.FC<InfractionFormProps> = ({ onCancel, onSubmit }) =
 
                     {/* Auto-filled Details */}
                     {selectedVehicle && (
-                        <div className="bg-background-dark/50 border border-white/5 p-3 rounded-lg grid grid-cols-2 gap-3 text-xs">
-                            <div>
+                        <div className="bg-background-dark/50 border border-white/5 p-3 rounded-lg grid grid-cols-3 gap-3 text-xs w-full">
+                            <div className="min-w-0">
                                 <span className="text-slate-500 block mb-0.5 text-[9px] uppercase font-bold">Infrator</span>
-                                <span className="text-white font-medium">{selectedVehicle.owner}</span>
+                                <span className="text-white font-medium block truncate" title={selectedVehicle.owner}>{selectedVehicle.owner}</span>
                             </div>
-                            <div>
+                            <div className="min-w-0">
                                 <span className="text-slate-500 block mb-0.5 text-[9px] uppercase font-bold">Vínculo</span>
-                                <span className="text-slate-300">{selectedVehicle.role}</span>
+                                <span className="text-slate-300 block truncate" title={selectedVehicle.role}>{selectedVehicle.role}</span>
                             </div>
-                            <div>
+                            <div className="min-w-0">
                                 <span className="text-slate-500 block mb-0.5 text-[9px] uppercase font-bold">Veículo</span>
-                                <span className="text-slate-300">{selectedVehicle.model} - {selectedVehicle.color}</span>
+                                <span className="text-slate-300 block truncate" title={`${selectedVehicle.model} - ${selectedVehicle.color}`}>{selectedVehicle.model} - {selectedVehicle.color}</span>
                             </div>
                         </div>
                     )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                    {/* 2. Infraction Type */}
+                    {/* Date and Time Fields */}
+                    <div className="space-y-2">
+                        <label className="text-xs font-semibold text-slate-300">Data da Ocorrência</label>
+                        <input
+                            type="date"
+                            className={cn("input-field w-full", errors.date && "border-status-error")}
+                            value={formData.date}
+                            onChange={e => setFormData({ ...formData, date: e.target.value })}
+                            style={{ colorScheme: 'dark' }}
+                        />
+                        {errors.date && <p className="text-status-error text-[10px] mt-1">{errors.date}</p>}
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-xs font-semibold text-slate-300">Hora</label>
+                        <input
+                            type="time"
+                            className={cn("input-field w-full", errors.time && "border-status-error")}
+                            value={formData.time}
+                            onChange={e => setFormData({ ...formData, time: e.target.value })}
+                            style={{ colorScheme: 'dark' }}
+                        />
+                        {errors.time && <p className="text-status-error text-[10px] mt-1">{errors.time}</p>}
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                    {/* Gate Selection */}
+                    <div className="space-y-2">
+                        <label className="text-xs font-semibold text-slate-300">Portaria</label>
+                        <select
+                            className={cn("input-field w-full", errors.gate && "border-status-error")}
+                            value={formData.gate}
+                            onChange={e => {
+                                setFormData({ ...formData, gate: e.target.value, location: '' });
+                            }}
+                        >
+                            <option value="">Selecione...</option>
+                            <option value="A">Portaria A</option>
+                            <option value="E">Portaria E</option>
+                        </select>
+                        {errors.gate && <p className="text-status-error text-[10px] mt-1">{errors.gate}</p>}
+                    </div>
+
+                    {/* Location (Dynamic) */}
+                    <div className="space-y-2">
+                        <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                            <MapPin size={14} className="text-slate-400" /> Local
+                        </label>
+                        <select
+                            className={cn("input-field w-full", errors.location && "border-status-error")}
+                            value={formData.location}
+                            onChange={e => setFormData({ ...formData, location: e.target.value })}
+                            disabled={!formData.gate}
+                        >
+                            <option value="">Selecione o local...</option>
+                            {formData.gate && GATE_LOCATIONS[formData.gate]?.map(l => (
+                                <option key={l} value={l}>{l}</option>
+                            ))}
+                        </select>
+                        {errors.location && <p className="text-status-error text-[10px] mt-1">{errors.location}</p>}
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
+                    {/* Infraction Type */}
                     <div className="space-y-2">
                         <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
                             <AlertTriangle size={14} className="text-slate-400" /> Tipo de Infração
@@ -175,22 +266,6 @@ const InfractionForm: React.FC<InfractionFormProps> = ({ onCancel, onSubmit }) =
                             {INFRACTION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                         {errors.type && <p className="text-status-error text-[10px] mt-1">{errors.type}</p>}
-                    </div>
-
-                    {/* 3. Location */}
-                    <div className="space-y-2">
-                        <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                            <MapPin size={14} className="text-slate-400" /> Localização
-                        </label>
-                        <select
-                            className={cn("input-field w-full", errors.location && "border-status-error")}
-                            value={formData.location}
-                            onChange={e => setFormData({ ...formData, location: e.target.value })}
-                        >
-                            <option value="">Selecione o local...</option>
-                            {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
-                        </select>
-                        {errors.location && <p className="text-status-error text-[10px] mt-1">{errors.location}</p>}
                     </div>
                 </div>
 
@@ -222,7 +297,7 @@ const InfractionForm: React.FC<InfractionFormProps> = ({ onCancel, onSubmit }) =
                 </div>
 
                 {/* 5. Description */}
-                <div className="space-y-2 pb-4">
+                <div className="space-y-2 pb-0">
                     <label className="text-xs font-semibold text-slate-300 block">
                         Descrição da Infração <span className="text-rose-500">*</span>
                     </label>
@@ -231,6 +306,7 @@ const InfractionForm: React.FC<InfractionFormProps> = ({ onCancel, onSubmit }) =
                         placeholder="Descreva detalhes importantes da ocorrência..."
                         value={formData.description}
                         onChange={e => setFormData({ ...formData, description: e.target.value })}
+                        rows={4}
                     />
                     {errors.description && <p className="text-status-error text-[10px] mt-1">{errors.description}</p>}
                 </div>
@@ -238,7 +314,7 @@ const InfractionForm: React.FC<InfractionFormProps> = ({ onCancel, onSubmit }) =
             </div>
 
             {/* Form Actions */}
-            <div className="p-4 border-t border-white/5 flex justify-end gap-3 bg-slate-900/40">
+            <div className="pt-4 flex justify-end gap-3 mt-2">
                 <button
                     type="button"
                     onClick={onCancel}

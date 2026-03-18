@@ -36,7 +36,7 @@
 
 ### 2. Módulos Operacionais
 - **Portaria A (Diretoria):** 90 vagas. Regras de acesso exclusivo para diretores (Seg-Sex, 06h-18h).
-- **Portaria E (Geral/Almoxarifado):** 260 vagas. Fluxo validado para prestadores e entregas.
+- **Portaria E (Geral/Almoxarifado):** 200 vagas. Fluxo validado para prestadores e entregas.
 - **Dashboard em Tempo Real:** Visão consolidada de ocupação, indicadores por categoria (CLT, Prestador, Residente) e gráficos de pátio.
 
 ### 3. Regras de Negócio (Integridade)

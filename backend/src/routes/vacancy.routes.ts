@@ -14,33 +14,34 @@ router.get('/next-number', async (req, res) => {
       return;
     }
 
-    const lastVacancy = await (prisma.vacancy as any).findFirst({
-      where: { gate: String(gate).toUpperCase() },
-      orderBy: { number: 'desc' },
+    const gateStr = String(gate).toUpperCase() as 'A' | 'E';
+
+    // Busca TODOS os números existentes para este portão
+    const existingVacancies = await (prisma.vacancy as any).findMany({
+      where: { gate: gateStr },
+      select: { number: true },
     });
 
-    let nextNumber = '';
-    if (gate === 'A') {
-      if (!lastVacancy) {
-        nextNumber = 'A-001';
-      } else {
-        const numPart = parseInt(lastVacancy.number.replace('A-', ''), 10);
-        nextNumber = `A-${String(numPart + 1).padStart(3, '0')}`;
-      }
-    } else if (gate === 'E') {
-      if (!lastVacancy) {
-        nextNumber = 'E-201'; // Default start for Gate E
-      } else {
-        const numPart = parseInt(lastVacancy.number.replace('E-', ''), 10);
-        nextNumber = `E-${String(numPart + 1).padStart(3, '0')}`;
+    // Extrai a parte numérica e pega o MÁXIMO — resistente a gaps de deleção
+    const prefix = gateStr === 'A' ? 'A-' : 'E-';
+    const defaultStart = gateStr === 'A' ? 1 : 201;
+
+    let maxNum = defaultStart - 1;
+    for (const v of existingVacancies) {
+      const parsed = parseInt(v.number.replace(prefix, ''), 10);
+      if (!isNaN(parsed) && parsed > maxNum) {
+        maxNum = parsed;
       }
     }
+
+    const nextNumber = `${prefix}${String(maxNum + 1).padStart(3, '0')}`;
 
     res.json({ nextNumber });
   } catch (error: any) {
     res.status(500).json({ error: 'Erro ao calcular próximo número.', details: error.message });
   }
 });
+
 
 // GET /v1/vacancies
 router.get('/', async (req, res) => {

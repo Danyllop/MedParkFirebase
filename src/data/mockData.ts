@@ -27,9 +27,46 @@ export const mockProviderVehicles = [
 ];
 
 export const historyData = [
-    { id: 1, timestamp: '10/03/2026 14:30', spot: 'A-042', event: 'ENTRADA', owner: 'ALAN FERNANDES DA SILVA', plate: 'KDC-1234', operator: 'MARIA SILVA' },
-    { id: 2, timestamp: '10/03/2026 15:15', spot: 'A-015', event: 'SAÍDA', owner: 'DANYLLO PEREIRA', plate: 'ABC-5E21', operator: 'JOÃO GOMES' },
-    { id: 3, timestamp: '10/03/2026 15:45', spot: 'A-088', event: 'RESERVA', owner: 'MARIA OLIVEIRA', plate: 'XYZ-9876', operator: 'MARIA SILVA' },
-    { id: 4, timestamp: '10/03/2026 16:20', spot: 'E-012', event: 'ENTRADA', owner: 'JOSE ALMEIDA', plate: 'BRA-1A22', operator: 'RICARDO SOUZA' },
-    { id: 5, timestamp: '10/03/2026 17:05', spot: 'A-042', event: 'SAÍDA', owner: 'ALAN FERNANDES DA SILVA', plate: 'KDC-1234', operator: 'JOÃO GOMES' },
+    {
+        id: 'log-1', createdAt: new Date(Date.now() - 20 * 60000).toISOString(),
+        spot: 'A-042', event: 'ENTRADA', ownerName: 'ALAN FERNANDES DA SILVA',
+        ownerRole: 'ENCARREGADO', ownerPhone: '(62) 98420-5689', plate: 'KDC-1234',
+        vehicleModel: 'TOYOTA COROLLA', vehicleColor: 'PRATA',
+        operator: { fullName: 'Maria Silva Santos', role: 'OPERADOR' }
+    },
+    {
+        id: 'log-2', createdAt: new Date(Date.now() - 65 * 60000).toISOString(),
+        spot: 'A-015', event: 'SAIDA', ownerName: 'DANYLLO PEREIRA',
+        ownerRole: 'ENCARREGADO', ownerPhone: '(62) 98420-5663', plate: 'ABC-5E21',
+        vehicleModel: 'HONDA CIVIC', vehicleColor: 'PRETO',
+        operator: { fullName: 'João Gomes Pereira', role: 'OPERADOR' }
+    },
+    {
+        id: 'log-3', createdAt: new Date(Date.now() - 90 * 60000).toISOString(),
+        spot: 'A-088', event: 'RESERVA', ownerName: 'MARIA OLIVEIRA',
+        ownerRole: 'MÉDICA', ownerPhone: '(62) 91234-5678', plate: 'XYZ-9876',
+        vehicleModel: 'JEEP COMPASS', vehicleColor: 'BRANCO',
+        operator: { fullName: 'Maria Silva Santos', role: 'OPERADOR' }
+    },
+    {
+        id: 'log-4', createdAt: new Date(Date.now() - 120 * 60000).toISOString(),
+        spot: 'E-012', event: 'ENTRADA', ownerName: 'JOSE ALMEIDA',
+        ownerRole: 'PRESTADOR', ownerPhone: null, plate: 'BRA-1A22',
+        vehicleModel: 'VW SAVEIRO', vehicleColor: 'BRANCO',
+        operator: { fullName: 'Ricardo Souza Lima', role: 'SUPERVISOR' }
+    },
+    {
+        id: 'log-5', createdAt: new Date(Date.now() - 180 * 60000).toISOString(),
+        spot: 'A-042', event: 'SAIDA', ownerName: 'ALAN FERNANDES DA SILVA',
+        ownerRole: 'ENCARREGADO', ownerPhone: '(62) 98420-5689', plate: 'KDC-1234',
+        vehicleModel: 'TOYOTA COROLLA', vehicleColor: 'PRATA',
+        operator: { fullName: 'João Gomes Pereira', role: 'OPERADOR' }
+    },
+    {
+        id: 'log-6', createdAt: new Date(Date.now() - 300 * 60000).toISOString(),
+        spot: 'E-098', event: 'LIBERACAO', ownerName: 'CARLOS AUTÔNOMO',
+        ownerRole: 'PRESTADOR', ownerPhone: '(62) 95555-6666', plate: 'XYZ-0001',
+        vehicleModel: 'FORD RANGER', vehicleColor: 'BRANCO',
+        operator: { fullName: 'Ricardo Souza Lima', role: 'ADMIN' }
+    },
 ];

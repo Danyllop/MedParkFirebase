@@ -46,6 +46,9 @@ const Providers = () => {
     const [vModel, setVModel] = useState('');
     const [vColor, setVColor] = useState('');
 
+    const [solicitante, setSolicitante] = useState('');
+    const [destino, setDestino] = useState('');
+
     // Company Registration State
     const [compName, setCompName] = useState('');
     const [compCnpj, setCompCnpj] = useState('');
@@ -74,6 +77,8 @@ const Providers = () => {
         setModalType('main');
         setIsAutonomous(false);
         setIsPedestrian(false);
+        setSolicitante('');
+        setDestino('');
         setIsModalOpen(true);
     };
 
@@ -92,6 +97,8 @@ const Providers = () => {
             setVPlate('');
             setVModel('');
             setVColor('');
+            setSolicitante('');
+            setDestino('');
             setIsModalOpen(true);
         }
     };
@@ -141,7 +148,9 @@ const Providers = () => {
                 cpf: providerCpf,
                 role: providerRole,
                 phone: providerPhone,
-                companyId: selectedCompany?.id || null
+                companyId: selectedCompany?.id || null,
+                requester: solicitante,
+                destination: destino
             });
 
             const newProvider = providerRes.data;
@@ -219,9 +228,29 @@ const Providers = () => {
         },
         { header: 'ID', accessor: 'id' },
         { header: 'Empresa', accessor: 'name', className: 'font-semibold' },
-        { header: 'CNPJ', accessor: 'cnpj' },
-        { header: 'Seguimento', accessor: 'segment' },
-        { header: 'Contato ou Telefone', accessor: 'contact' },
+        { header: 'CNPJ/Seguimento', accessor: (item: any) => (
+            <div className="flex flex-col">
+                <span className="font-mono">{item.cnpj}</span>
+                <span className="text-[10px] text-slate-500 font-bold uppercase">{item.segment || item.role}</span>
+            </div>
+        ) },
+        { header: 'Contato', accessor: 'contact' },
+        { header: 'Solicitante / Destino', accessor: (item: any) => (
+            <div className="flex flex-col gap-1">
+                {item.requester ? (
+                    <span className="text-xs font-bold text-white uppercase">{item.requester}</span>
+                ) : (
+                    <span className="text-xs font-bold text-slate-500">-</span>
+                )}
+                {item.destination ? (
+                    <span className="inline-block px-2 py-0.5 rounded text-[9px] font-black bg-white/5 text-slate-300 border border-white/10 uppercase max-w-max">
+                        {item.destination}
+                    </span>
+                ) : (
+                    <span className="text-[9px] font-bold text-slate-500 uppercase">SEM DESTINO FIXO</span>
+                )}
+            </div>
+        ) },
     ];
 
     const providerColumns: any[] = [
@@ -253,9 +282,29 @@ const Providers = () => {
             )
         },
         { header: 'Nome Completo', accessor: 'name', className: 'font-semibold' },
-        { header: 'CPF', accessor: 'cpf' },
-        { header: 'Cargo', accessor: 'role' },
+        { header: 'CPF/Cargo', accessor: (item: any) => (
+            <div className="flex flex-col">
+                <span>{item.cpf}</span>
+                <span className="text-[10px] text-slate-500 font-bold uppercase">{item.role}</span>
+            </div>
+        ) },
         { header: 'Telefone', accessor: 'phone' },
+        { header: 'Solicitante / Destino', accessor: (item: any) => (
+            <div className="flex flex-col gap-1">
+                {item.requester ? (
+                    <span className="text-xs font-bold text-white uppercase">{item.requester}</span>
+                ) : (
+                    <span className="text-xs font-bold text-slate-500">-</span>
+                )}
+                {item.destination ? (
+                    <span className="inline-block px-2 py-0.5 rounded text-[9px] font-black bg-white/5 text-slate-300 border border-white/10 uppercase max-w-max">
+                        {item.destination}
+                    </span>
+                ) : (
+                    <span className="text-[9px] font-bold text-slate-500 uppercase">SEM DESTINO FIXO</span>
+                )}
+            </div>
+        ) },
     ];
 
     const vehicleColumns: any[] = [
@@ -580,6 +629,30 @@ const Providers = () => {
                                         onChange={(e) => setCompPhone(maskPhone(e.target.value))}
                                     />
                                 </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Solicitante <span className="text-slate-600 lowercase capitalize">(Opcional)</span></label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white uppercase" 
+                                        placeholder="NOME DO SOLICITANTE..." 
+                                        value={solicitante}
+                                        onChange={(e) => setSolicitante(e.target.value.toUpperCase())}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Destino <span className="text-slate-600 lowercase capitalize">(Opcional)</span></label>
+                                    <select 
+                                        className="w-full bg-slate-800 border border-white/10 rounded-lg text-sm p-2 text-white focus:border-accent/40 focus:outline-none transition-colors"
+                                        value={destino}
+                                        onChange={(e) => setDestino(e.target.value)}
+                                    >
+                                        <option value="">Selecione um Destino</option>
+                                        <option value="ALMOXARIFADO">ALMOXARIFADO</option>
+                                        <option value="MANUTENÇÃO">MANUTENÇÃO</option>
+                                        <option value="LIMPEZA">LIMPEZA</option>
+                                        <option value="COZINHA">COZINHA</option>
+                                    </select>
+                                </div>
                             </div>
 
                             {!isPedestrian && (
@@ -791,6 +864,30 @@ const Providers = () => {
                                         value={providerPhone}
                                         onChange={(e) => setProviderPhone(maskPhone(e.target.value))}
                                     />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Solicitante <span className="text-slate-600 lowercase capitalize">(Opcional)</span></label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full bg-slate-800 border-white/10 rounded-lg text-sm p-2 text-white uppercase" 
+                                        placeholder="NOME DO SOLICITANTE..." 
+                                        value={solicitante}
+                                        onChange={(e) => setSolicitante(e.target.value.toUpperCase())}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Destino <span className="text-slate-600 lowercase capitalize">(Opcional)</span></label>
+                                    <select 
+                                        className="w-full bg-slate-800 border border-white/10 rounded-lg text-sm p-2 text-white focus:border-accent/40 focus:outline-none transition-colors"
+                                        value={destino}
+                                        onChange={(e) => setDestino(e.target.value)}
+                                    >
+                                        <option value="">Selecione um Destino</option>
+                                        <option value="ALMOXARIFADO">ALMOXARIFADO</option>
+                                        <option value="MANUTENÇÃO">MANUTENÇÃO</option>
+                                        <option value="LIMPEZA">LIMPEZA</option>
+                                        <option value="COZINHA">COZINHA</option>
+                                    </select>
                                 </div>
                             </div>
 

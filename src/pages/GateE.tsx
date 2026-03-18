@@ -15,11 +15,14 @@ import {
     Package,
     Edit,
     Trash2,
-    RotateCcw
+    RotateCcw,
+    ShieldAlert
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../store/AuthContext';
+import { mockEmployees, mockVehicles } from '../data/mockData';
+import Modal from '../components/ui/Modal';
 
 interface Vacancy {
     id: number;
@@ -45,6 +48,13 @@ const PortariaE = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterDestination, setFilterDestination] = useState('');
     const [typeFilter] = useState<'TODOS' | Vacancy['type']>('TODOS');
+
+    // Manual Entry State
+    const [isManualEntryOpen, setIsManualEntryOpen] = useState(false);
+    const [manualSearchTerm, setManualSearchTerm] = useState('');
+    const [selectedEmployeeForEntry, setSelectedEmployeeForEntry] = useState<any>(null);
+    const [manualEntryStep, setManualEntryStep] = useState<'search' | 'confirm'>('search');
+    const [entrySpotSearch, setEntrySpotSearch] = useState('');
 
     // Load from local storage or generate 200 spots
     useEffect(() => {
@@ -171,6 +181,17 @@ const PortariaE = () => {
         }
     };
 
+    const handleDeleteSpot = (spot: Vacancy) => {
+        if (!isAdmin) return;
+        if (confirm(`Tem certeza que deseja excluir a vaga ${spot.number}?`)) {
+            const updatedVacancies = vacancies.filter(v => v.id !== spot.id);
+            setVacancies(updatedVacancies);
+            localStorage.setItem('gate_e_vacancies', JSON.stringify(updatedVacancies));
+            if (selectedVacancy?.id === spot.id) setSelectedVacancy(null);
+            alert(`Vaga ${spot.number} excluída.`);
+        }
+    };
+
     const getSpotStyle = (vacancy: Vacancy) => {
         switch (vacancy.status) {
             case 'LIVRE': return "bg-emerald-500/5 border-emerald-500/20 text-emerald-500 hover:border-emerald-500/40 hover:bg-emerald-500/10";
@@ -240,7 +261,7 @@ const PortariaE = () => {
                     <div className="relative min-w-[200px]">
                         <Package className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
                         <select
-                            className="w-full bg-slate-900/50 border border-white/5 rounded-xl pl-10 pr-4 py-3 text-xs focus:outline-none focus:border-accent/40 transition-all text-white appearance-none font-bold uppercase tracking-widest"
+                            className="w-full bg-slate-900/50 border border-white/5 rounded-xl pl-10 pr-4 py-3 text-xs focus:outline-none focus:border-accent/40 transition-all text-white appearance-none font-bold uppercase tracking-widest cursor-pointer"
                             value={filterDestination}
                             onChange={(e) => setFilterDestination(e.target.value)}
                         >
@@ -251,6 +272,13 @@ const PortariaE = () => {
                             <option value="COZINHA">Cozinha</option>
                         </select>
                     </div>
+
+                    <button 
+                        onClick={() => setIsManualEntryOpen(true)}
+                        className="h-10 px-4 bg-accent hover:bg-accent/90 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-accent/20 flex items-center gap-2 whitespace-nowrap"
+                    >
+                        <LogIn size={14} /> ENTRADA MANUAL
+                    </button>
 
                     <div className="flex items-center gap-3 ml-auto">
                         <div className="flex h-10 items-center bg-slate-900 border border-white/5 p-1 rounded-xl shadow-inner">
@@ -438,7 +466,7 @@ const PortariaE = () => {
                                                         </button>
                                                         {isAdmin && (
                                                             <button 
-                                                                onClick={(e) => { e.stopPropagation(); /* TODO: Implement Delete */ }}
+                                                                onClick={(e) => { e.stopPropagation(); handleDeleteSpot(vacancy); }}
                                                                 className="p-1.5 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-rose-500 transition-colors"
                                                                 title="Deletar Vaga"
                                                             >
@@ -541,7 +569,14 @@ const PortariaE = () => {
                                         <p className="text-sm font-bold text-slate-300">Vaga Disponível</p>
                                         <p className="text-[10px] text-slate-500 mt-1">Pronta para nova entrada de serviço.</p>
                                     </div>
-                                    <button className="w-full py-4 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 font-black text-xs uppercase tracking-[0.2em] rounded-xl transition-all border border-emerald-500/20 flex items-center justify-center gap-3">
+                                    <button 
+                                        onClick={() => {
+                                            setEntrySpotSearch(selectedVacancy.number);
+                                            setIsManualEntryOpen(true);
+                                            setManualEntryStep('search');
+                                        }}
+                                        className="w-full py-4 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 font-black text-xs uppercase tracking-[0.2em] rounded-xl transition-all border border-emerald-500/20 flex items-center justify-center gap-3"
+                                    >
                                         <LogIn size={16} /> Entrada Manual
                                     </button>
                                 </div>
@@ -585,6 +620,283 @@ const PortariaE = () => {
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* Manual Entry Modal for Portaria E */}
+            <Modal
+                isOpen={isManualEntryOpen}
+                onClose={() => {
+                    setIsManualEntryOpen(false);
+                    setManualEntryStep('search');
+                    setSelectedEmployeeForEntry(null);
+                    setManualSearchTerm('');
+                    setEntrySpotSearch('');
+                }}
+                title={manualEntryStep === 'search' ? "REGISTRAR ENTRADA MANUAL (PÁTIO E)" : "CONFIRMAR ENTRADA"}
+            >
+                <div className="space-y-6 py-2">
+                    {manualEntryStep === 'search' ? (
+                        <>
+                            <div className="relative group">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-accent transition-colors" size={18} />
+                                <input 
+                                    className="w-full h-12 pl-12 pr-4 bg-slate-900 border border-white/5 rounded-xl focus:border-accent/40 transition-all font-medium placeholder:text-slate-600 uppercase text-white"
+                                    placeholder="BUSCAR POR NOME, CPF, PLACA OU ADESIVO..." 
+                                    type="text"
+                                    autoFocus
+                                    value={manualSearchTerm}
+                                    onChange={(e) => setManualSearchTerm(e.target.value.toUpperCase())}
+                                />
+                            </div>
+
+                            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 no-scrollbar">
+                                {manualSearchTerm.length >= 2 ? (
+                                    mockEmployees
+                                        .filter(emp => {
+                                            const vehicle = mockVehicles.find(v => v.ownerId === emp.id);
+                                            return emp.name.includes(manualSearchTerm) || 
+                                                   emp.cpf.includes(manualSearchTerm) ||
+                                                   vehicle?.plate.includes(manualSearchTerm);
+                                        })
+                                        .map(emp => {
+                                            const vehicle = mockVehicles.find(v => v.ownerId === emp.id);
+                                            return (
+                                                <div 
+                                                    key={emp.id}
+                                                    onClick={() => {
+                                                        setSelectedEmployeeForEntry(emp);
+                                                        setManualEntryStep('confirm');
+                                                    }}
+                                                    className="p-4 bg-slate-800/40 border border-white/5 rounded-xl hover:border-accent/30 transition-all group cursor-pointer"
+                                                >
+                                                    <div className="flex items-center justify-between gap-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="size-10 rounded-full bg-slate-700 flex items-center justify-center text-slate-400 group-hover:bg-accent/20 group-hover:text-accent transition-colors">
+                                                                <User size={18} />
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-xs font-black text-white uppercase tracking-tight">{emp.name}</p>
+                                                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{emp.role} • {emp.bond}</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            {vehicle && (
+                                                                <div className="flex items-center gap-2 justify-end">
+                                                                    <Car size={14} className="text-accent" />
+                                                                    <span className="text-xs font-black text-white tracking-widest">{vehicle.plate}</span>
+                                                                </div>
+                                                            )}
+                                                            <button className="mt-2 px-3 py-1.5 bg-accent/10 group-hover:bg-accent text-accent group-hover:text-white rounded-lg text-[9px] font-black uppercase tracking-widest transition-all">
+                                                                Selecionar
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                ) : (
+                                    <div className="py-10 text-center text-slate-600">
+                                        <Search size={32} className="mx-auto mb-3 opacity-20" />
+                                        <p className="text-xs font-bold uppercase tracking-widest">Digite pelo menos 2 caracteres para pesquisar</p>
+                                    </div>
+                                )}
+                                
+                                {manualSearchTerm.length >= 2 && mockEmployees.filter(emp => {
+                                    const vehicle = mockVehicles.find(v => v.ownerId === emp.id);
+                                    return emp.name.includes(manualSearchTerm) || 
+                                           emp.cpf.includes(manualSearchTerm) ||
+                                           vehicle?.plate.includes(manualSearchTerm);
+                                }).length === 0 && (
+                                    <div className="py-10 text-center text-slate-500">
+                                        <p className="text-xs font-bold uppercase tracking-widest">Nenhum cadastro encontrado</p>
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    ) : (
+                        <div className="space-y-6">
+                            {(() => {
+                                const vehicle = mockVehicles.find(v => v.ownerId === selectedEmployeeForEntry?.id);
+                                const isAlreadyInside = vacancies.find(v => 
+                                    v.status === 'OCUPADA' && 
+                                    ((v.owner && v.owner === selectedEmployeeForEntry?.name) || 
+                                     (v.plate && vehicle && v.plate === vehicle.plate))
+                                );
+
+                                const normalizedSearch = entrySpotSearch.toUpperCase().trim();
+                                const numberMatchSearch = normalizedSearch.replace(/[^0-9]/g, '');
+                                
+                                const matchedSpot = entrySpotSearch ? vacancies.find(v => {
+                                    if (v.number === normalizedSearch) return true;
+                                    if (numberMatchSearch && v.number.endsWith(numberMatchSearch.padStart(3, '0'))) return true;
+                                    return false;
+                                }) : null;
+
+                                const isSpotOccupied = matchedSpot?.status === 'OCUPADA';
+                                const isSpotReservedOrMaintenance = matchedSpot?.status === 'RESERVADA' || matchedSpot?.status === 'MANUTENCAO';
+                                const canConfirm = matchedSpot && !isSpotOccupied && !isAlreadyInside && !isSpotReservedOrMaintenance;
+
+                                return (
+                                    <>
+                                        <div className="p-6 bg-slate-900/50 border border-white/5 rounded-2xl">
+                                            <div className="flex items-center gap-4 mb-6">
+                                                <div className="size-14 rounded-2xl bg-accent/20 flex items-center justify-center text-accent">
+                                                    <User size={28} />
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-lg font-black text-white uppercase tracking-tight">{selectedEmployeeForEntry?.name}</h3>
+                                                    <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">{selectedEmployeeForEntry?.role} • {selectedEmployeeForEntry?.bond}</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="p-4 bg-slate-800/40 rounded-xl border border-white/5">
+                                                    <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">CPF</p>
+                                                    <p className="text-sm font-bold text-white tracking-wider">{selectedEmployeeForEntry?.cpf}</p>
+                                                </div>
+                                                <div className="p-4 bg-slate-800/40 rounded-xl border border-white/5">
+                                                    <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Veículo / Placa</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <Car size={16} className="text-accent" />
+                                                        <p className="text-sm font-black text-white tracking-widest">
+                                                            {vehicle?.plate || 'NÃO VINCULADA'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {isAlreadyInside && (
+                                            <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-start gap-3">
+                                                <ShieldAlert className="text-rose-500 mt-0.5" size={18} />
+                                                <div>
+                                                    <p className="text-xs font-black text-rose-500 uppercase tracking-widest mb-1">Entrada Bloqueada</p>
+                                                    <p className="text-[10px] text-rose-400 font-bold uppercase tracking-wider">
+                                                        Este colaborador já possui uma entrada ativa na Vaga {isAlreadyInside.number}. É necessário registrar a saída antes de uma nova entrada.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {!isAlreadyInside && (
+                                            <div className="space-y-3">
+                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Vaga de Destino</label>
+                                                <div className="relative group">
+                                                    <Map className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-accent transition-colors" size={18} />
+                                                    <input 
+                                                        className="w-full h-12 pl-12 pr-4 bg-slate-900 border border-white/5 rounded-xl focus:border-accent/40 transition-all font-medium placeholder:text-slate-600 uppercase text-white"
+                                                        placeholder="DIGITE O NÚMERO DA VAGA (EX: 05)..." 
+                                                        type="text"
+                                                        value={entrySpotSearch}
+                                                        onChange={(e) => setEntrySpotSearch(e.target.value)}
+                                                    />
+                                                </div>
+
+                                                {entrySpotSearch && (
+                                                    <div className={cn(
+                                                        "p-4 rounded-xl border transition-all flex items-center justify-between",
+                                                        !matchedSpot && "bg-slate-800/50 border-white/5",
+                                                        matchedSpot && !isSpotOccupied && "bg-emerald-500/10 border-emerald-500/20",
+                                                        matchedSpot && (isSpotOccupied || isSpotReservedOrMaintenance) && "bg-rose-500/10 border-rose-500/20"
+                                                    )}>
+                                                        {!matchedSpot ? (
+                                                            <div className="flex items-center gap-2 text-slate-400">
+                                                                <Info size={16} />
+                                                                <span className="text-xs font-bold uppercase tracking-widest">Vaga não encontrada</span>
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                <div className="flex items-center gap-4">
+                                                                    <div className={cn(
+                                                                        "h-10 px-4 rounded-lg flex items-center justify-center font-black",
+                                                                        !isSpotOccupied && !isSpotReservedOrMaintenance ? "bg-emerald-500/20 text-emerald-500" : "bg-rose-500/20 text-rose-500"
+                                                                    )}>
+                                                                        {matchedSpot.number}
+                                                                    </div>
+                                                                    <div className="flex items-center gap-3">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{matchedSpot.type}</span>
+                                                                        </div>
+                                                                        <div className="w-1 h-1 rounded-full bg-white/10" />
+                                                                        <p className={cn(
+                                                                            "text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5",
+                                                                            (!isSpotOccupied && !isSpotReservedOrMaintenance ? "text-emerald-500" : "text-rose-500")
+                                                                        )}>
+                                                                            <span className="text-slate-500">STATUS:</span> 
+                                                                            {matchedSpot.status === 'LIVRE' ? 'DISPONÍVEL' : matchedSpot.status}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                                {(isSpotOccupied || isSpotReservedOrMaintenance) && <Ban className="opacity-50 text-rose-500" size={20} />}
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        <div className="grid grid-cols-2 gap-4 mt-6">
+                                            <button 
+                                                onClick={() => {
+                                                    setManualEntryStep('search');
+                                                    setEntrySpotSearch('');
+                                                }}
+                                                className="w-full py-4 bg-slate-800 hover:bg-slate-700 text-white font-black text-xs uppercase tracking-[0.2em] rounded-xl transition-all border border-white/5"
+                                            >
+                                                VOLTAR
+                                            </button>
+                                            <button 
+                                                disabled={!canConfirm}
+                                                onClick={() => {
+                                                    if (!canConfirm || !matchedSpot) return;
+
+                                                    const updatedVacancies = vacancies.map(v => {
+                                                        if (v.id === matchedSpot.id) {
+                                                            return {
+                                                                ...v,
+                                                                status: 'OCUPADA' as const,
+                                                                owner: selectedEmployeeForEntry.name,
+                                                                plate: vehicle?.plate,
+                                                                vehicle: vehicle ? vehicle.model : undefined
+                                                            };
+                                                        }
+                                                        return v;
+                                                    });
+                                                    setVacancies(updatedVacancies);
+                                                    localStorage.setItem('gate_e_vacancies', JSON.stringify(updatedVacancies));
+
+                                                    setIsManualEntryOpen(false);
+                                                    setManualEntryStep('search');
+                                                    setSelectedEmployeeForEntry(null);
+                                                    setManualSearchTerm('');
+                                                    setEntrySpotSearch('');
+                                                    setSelectedVacancy(null);
+                                                    
+                                                    addHistoryEntry({
+                                                        spot: matchedSpot.number,
+                                                        event: 'ENTRADA',
+                                                        owner: selectedEmployeeForEntry.name,
+                                                        plate: vehicle?.plate || 'S/ PLACA'
+                                                    });
+
+                                                    alert(`Entrada registrada com sucesso na vaga ${matchedSpot.number}!`);
+                                                }}
+                                                className={cn(
+                                                    "w-full py-4 font-black text-xs uppercase tracking-[0.2em] rounded-xl transition-all flex items-center justify-center gap-2",
+                                                    canConfirm 
+                                                        ? "bg-accent hover:bg-accent/90 text-white shadow-lg shadow-accent/20" 
+                                                        : "bg-slate-800 text-slate-500 cursor-not-allowed opacity-50"
+                                                )}
+                                            >
+                                                <LogIn size={18} /> REGISTRAR
+                                            </button>
+                                        </div>
+                                    </>
+                                );
+                            })()}
+                        </div>
+                    )}
+                </div>
+            </Modal>
         </div>
     );
 };

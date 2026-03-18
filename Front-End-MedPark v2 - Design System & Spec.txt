@@ -49,7 +49,7 @@ ESTILO: ENTERPRISE PREMIUM DARK MODE (APPLE-LIKE AESTHETICS)
   - Regra Especial: Vagas Diretoria bloqueadas visualmente Seg-Sex (06h-18h).
   - Mapa: Grid interativo refletindo status em tempo real via WebSocket.
 
-3.4. PORTARIA E (260 VAGAS - ALMOXARIFADO)
+3.4. PORTARIA E (200 VAGAS - ALMOXARIFADO)
   - Busca Universal: Integrada com tabelas de Funcionários e Prestadores.
   - Fluxo: Campo extra de "Destino" com destaque para "Almoxarifado".
 

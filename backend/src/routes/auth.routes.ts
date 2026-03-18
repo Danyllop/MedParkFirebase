@@ -19,13 +19,21 @@ router.post('/login', async (req, res) => {
 
     const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
 
-    if (!user || user.status !== 'ATIVO') {
+    if (!user) {
+      console.warn(`[AUTH] Login falhou: Usuário não encontrado - ${email}`);
+      res.status(401).json({ error: 'Credenciais inválidas ou usuário inativo.' });
+      return;
+    }
+
+    if (user.status !== 'ATIVO') {
+      console.warn(`[AUTH] Login falhou: Usuário inativo - ${email}`);
       res.status(401).json({ error: 'Credenciais inválidas ou usuário inativo.' });
       return;
     }
 
     const isValid = await comparePassword(password, user.passwordHash);
     if (!isValid) {
+      console.warn(`[AUTH] Login falhou: Senha incorreta - ${email}`);
       res.status(401).json({ error: 'Credenciais inválidas.' });
       return;
     }
