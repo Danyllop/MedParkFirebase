@@ -7,7 +7,7 @@ export const authMiddleware = createMiddleware(async (c, next) => {
     }
     const token = authHeader.split(' ')[1];
     try {
-        const decoded = verifyToken(token);
+        const decoded = await verifyToken(token);
         c.set('user', decoded);
         await next();
     }

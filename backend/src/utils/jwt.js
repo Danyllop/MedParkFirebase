@@ -1,8 +1,10 @@
-import jwt from 'jsonwebtoken';
+import { sign, verify } from 'hono/jwt';
 import { env } from '../config/env.js';
-export function generateToken(payload) {
-    return jwt.sign(payload, env.JWT_SECRET, { expiresIn: env.JWT_EXPIRES_IN });
+export async function generateToken(payload) {
+    // Hono uses Web Crypto, which requires 'HS256' or similar.
+    return await sign(payload, env.JWT_SECRET, 'HS256');
 }
-export function verifyToken(token) {
-    return jwt.verify(token, env.JWT_SECRET);
+export async function verifyToken(token) {
+    const decoded = await verify(token, env.JWT_SECRET, 'HS256');
+    return decoded;
 }

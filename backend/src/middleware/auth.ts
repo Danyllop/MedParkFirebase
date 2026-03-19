@@ -20,8 +20,8 @@ export const authMiddleware = createMiddleware<{ Variables: AuthVariables }>(asy
   const token = authHeader.split(' ')[1];
 
   try {
-    const decoded = verifyToken(token) as AuthVariables['user'];
-    c.set('user', decoded);
+    const decoded = await verifyToken(token);
+    c.set('user', decoded as AuthVariables['user']);
     await next();
   } catch {
     return c.json({ error: 'Token inválido ou expirado.' }, 401);

@@ -24,7 +24,7 @@ router.post('/login', zValidator('json', loginSchema), async (c) => {
             console.warn(`[AUTH] Login falhou: Senha incorreta - ${email}`);
             return c.json({ error: 'Credenciais inválidas.' }, 401);
         }
-        const token = generateToken({
+        const token = await generateToken({
             userId: user.id,
             email: user.email,
             role: user.role,
