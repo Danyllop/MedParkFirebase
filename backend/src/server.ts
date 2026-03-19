@@ -18,6 +18,12 @@ import searchRoutes from './routes/search.routes.js';
 
 const app = new Hono().basePath('/v1');
 
+// Inject Cloudflare Env into our global registry
+app.use('*', async (c, next) => {
+  setGlobalEnv(c.env);
+  await next();
+});
+
 // Middleware
 app.use('*', cors({
   origin: (origin) => {
