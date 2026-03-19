@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const isProd = import.meta.env.PROD;
+const isProd = import.meta.env.PROD || (typeof window !== 'undefined' && window.location.hostname.endsWith('.pages.dev'));
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || (isProd ? 'https://medparkbackend.danyllojc-pereira.workers.dev/v1' : 'http://localhost:3333/v1');
 
 const api = axios.create({
