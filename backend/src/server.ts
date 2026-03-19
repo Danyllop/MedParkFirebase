@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { env } from './config/env.js';
+import { env, setGlobalEnv } from './config/env.js';
 import prisma from './config/prisma.js';
 
 // Routes
