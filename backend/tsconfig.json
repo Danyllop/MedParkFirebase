@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ESNext"],
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["@cloudflare/workers-types"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@medpark/shared": ["../packages/shared/index.ts"]
+    }
+  },
+  "include": ["src/**/*", "prisma/**/*", ".env"],
+  "exclude": ["node_modules", "dist"]
+}

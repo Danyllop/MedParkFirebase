@@ -1,26 +1,51 @@
-# Logs
-logs
+# Logs and temporary files
+node_modules
+dist
+dist-ssr
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+build_errors.txt
+refactor-hono-routes.ts
+.gitignore_backend_ref
 
-node_modules
-dist
-dist-ssr
-*.local
+# Environment and Secrets
 .env
-.agent
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+*.key
 
-# Editor directories and files
+# Cloudflare / Wrangler
+.wrangler
+.dev.vars
+
+# Prisma
+/prisma/migrations
+/backend/prisma/migrations
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# User specific request: No package-lock
+package-lock.json
+**/package-lock.json
+
+# IDE
 .vscode/*
 !.vscode/extensions.json
 .idea
-.DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# Agent
+.agent

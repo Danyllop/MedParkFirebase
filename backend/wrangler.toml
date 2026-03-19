@@ -1,0 +1,13 @@
+name = "medpark-backend"
+main = "src/server.ts"
+compatibility_date = "2024-03-18"
+
+[vars]
+# NODE_ENV = "production"
+# DATABASE_URL = "postgres://..." (Set this in Cloudflare Dashboard for security)
+# JWT_SECRET = "..." (Set this in Cloudflare Dashboard)
+# PEPPER_SECRET = "..." (Set this in Cloudflare Dashboard)
+# DEFAULT_PASSWORD = "..." (Set this in Cloudflare Dashboard)
+
+# Cloudflare Workers don't use .env files in production. 
+# Secrets should be added via 'wrangler secret put' or the Dashboard.
