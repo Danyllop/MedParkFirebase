@@ -20,12 +20,22 @@ const app = new Hono().basePath('/v1');
 
 // Middleware
 app.use('*', cors({
-  origin: [
-    'http://localhost:5173', 
-    'http://localhost:3000', 
-    'https://medpark.pages.dev',
-    'https://medpark-saas.pages.dev'
-  ],
+  origin: (origin) => {
+    // Permitir localhost para desenvolvimento
+    if (origin.includes('localhost') || origin.includes('127.0.0.1')) return origin;
+    
+    // Permitir domínios da Cloudflare (Pages e Workers)
+    if (origin.endsWith('.pages.dev') || origin.endsWith('.workers.dev')) return origin;
+    
+    // Fallback para domínios específicos conhecidos
+    const allowed = [
+      'https://medpark.pages.dev',
+      'https://medpark-saas.pages.dev',
+      'https://medpark-frontend.pages.dev'
+    ];
+    
+    return allowed.includes(origin) ? origin : allowed[0];
+  },
   credentials: true,
 }));
 

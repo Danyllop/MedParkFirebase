@@ -1,13 +1,20 @@
 import axios from 'axios';
 
+const isProd = import.meta.env.PROD;
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || (isProd ? 'https://medparkbackend.danyllojc-pereira.workers.dev/v1' : 'http://localhost:3333/v1');
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3333/v1',
+  baseURL: apiBaseUrl,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-console.log('🔌 API BaseURL:', api.defaults.baseURL);
+console.log(`🔌 [${isProd ? 'PROD' : 'DEV'}] API BaseURL:`, api.defaults.baseURL);
+
+if (isProd && !import.meta.env.VITE_API_BASE_URL) {
+  console.warn('⚠️ VITE_API_BASE_URL não está definida no ambiente de produção. Usando fallback do Worker.');
+}
 
 // PRIMEIRO: Interceptor para adicionar o token em TODAS as requisições
 api.interceptors.request.use((config) => {
