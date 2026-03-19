@@ -48,7 +48,12 @@ router.post('/login', zValidator('json', loginSchema), async (c) => {
       },
     });
   } catch (error: any) {
-    return c.json({ error: 'Erro ao realizar login.', details: error.message }, 500);
+    console.error(`[AUTH] Erro no login para ${c.req.valid('json').email}:`, error);
+    return c.json({ 
+      error: 'Erro ao realizar login.', 
+      details: error.message,
+      code: error.code || 'UNKNOWN'
+    }, 500);
   }
 });
 

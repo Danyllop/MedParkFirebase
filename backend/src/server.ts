@@ -61,8 +61,19 @@ app.route('/infractions', infractionRoutes);
 app.route('/reports', reportRoutes);
 app.route('/search', searchRoutes);
 
-// Error and 404 handler can be added with app.onError and app.notFound
-// Background tasks (like cleanupOldLogs) should be moved to Cloudflare Cron Triggers.
+// Error and 404 handler
+app.onError((err, c) => {
+  console.error(`[GLOBAL ERROR] ${c.req.method} ${c.req.url}:`, err);
+  return c.json({ 
+    error: 'Internal Server Error', 
+    message: err.message,
+    stack: env.PORT === 3333 ? err.stack : undefined // Show stack only in dev (localhost)
+  }, 500);
+});
+
+app.notFound((c) => {
+  return c.json({ error: 'Not Found', path: c.req.path }, 404);
+});
 
 export default app;
 
