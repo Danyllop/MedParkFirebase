@@ -93,4 +93,4 @@ firebase deploy --only hosting
 
 ## 👤 Autor
 **Danyllo Jonathas Cunha Pereira**  
-*Atualizado em: 20/03/2026*
+*Atualizado em: 20/03/2026 - CI/CD Habilitado*
