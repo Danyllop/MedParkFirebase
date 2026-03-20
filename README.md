@@ -1,62 +1,60 @@
-# MedPark - Gestão de Estacionamento Hospitalar
+# MedPark - Gestão de Estacionamento Hospitalar (Firebase Edition)
 
-![MedPark Banner](https://img.shields.io/badge/Status-Development-orange)
-![Cloudflare Workers](https://img.shields.io/badge/Backend-Hono%20%28Edge%29-blue)
-![React](https://img.shields.io/badge/Frontend-React%20%2B%20TS-blue)
-![Vite](https://img.shields.io/badge/Build-Vite-purple)
+![MedPark Banner](https://img.shields.io/badge/Status-Migration%20Complete-green)
+![Firebase](https://img.shields.io/badge/Backend-Firebase%20%2F%20Cloud%20Functions-orange)
+![React](https://img.shields.io/badge/Frontend-React%2019-blue)
+![Vite](https://img.shields.io/badge/Build-Vite%207-purple)
 
-**MedPark** é uma solução SaaS de alta performance para a gestão inteligente de pátios e estacionamentos hospitalares. O sistema é uma aplicação monorepo nativa da Cloudflare, utilizando tecnologias Edge para latência mínima e alta escalabilidade.
+**MedPark** é uma solução SaaS de alta performance para a gestão inteligente de pátios e estacionamentos hospitalares. O sistema foi migrado para o ecossistema **Firebase**, utilizando **Firestore** como banco de dados NoSQL e **Firebase Auth** para autenticação robusta e segura.
 
 ---
 
 ## 🚀 Tecnologias Utilizadas
 
-### Frontend (Cloudflare Pages)
+### Frontend (Firebase Hosting)
 - **Framework:** React 19 com TypeScript.
 - **Build:** Vite 7.
+- **SDK:** Firebase JS SDK v11+.
 - **Estilização:** TailwindCSS v4 & Vanilla CSS.
-- **Estado:** React Context API & Axios.
+- **Estado:** React Context API & Firebase Hooks.
 
-### Backend (Cloudflare Workers)
-- **Framework:** Hono (Ultrafast web framework for the Edge).
-- **Runtime:** Cloudflare Workers (V8 Isolate).
-- **Banco de Dados:** PostgreSQL via Prisma Client (Edge Runtime).
-- **Segurança:** Web Cryptography API (PBKDF2) para hashing de senhas.
-- **Autenticação:** JWT (Stateless).
+### Backend & Database (Firebase)
+- **Database:** Google Cloud Firestore (NoSQL, Real-time).
+- **Authentication:** Firebase Authentication (E-mail/Senha).
+- **Functions:** Firebase Cloud Functions Gen 2 (Node.js).
+- **Hosting:** Firebase Hosting com SSL automático e CDN global.
 
 ---
 
 ## 📋 Especificações Funcionais
 
 ### 1. Níveis de Acesso
-- **ADMIN:** Controle total, gestão de usuários e logs globais.
-- **SUPERVISOR:** Gestão de operadores e cadastros permanentes.
-- **OPERADOR:** Foco operacional (entrada/saída e cadastros temporários).
+- **ADMIN:** Controle total, gestão de usuários e auditoria global no Firestore.
+- **SUPERVISOR:** Gestão de operadores e cadastros de colaboradores/veículos.
+- **OPERADOR:** Foco operacional (entrada/saída manual, reserva de vagas).
 
-### 2. Regras de Negócio
-- **Validação Anti-passback:** Bloqueio de entrada duplicada para o mesmo veículo.
-- **Gestão de Vagas:** Regras específicas por categoria (PNE, Idoso, Diretoria, Almoxarifado).
-- **Sincronização Edge:** CRUDs otimizados para execução em isolados V8.
+### 2. Regras de Negócio e Otimizações
+- **Anti-passback:** Validação em tempo real para impedir entradas duplicadas.
+- **Otimização Spark Plan:** 
+  - **Offline Persistence**: Dados cacheados localmente no navegador.
+  - **Memory Caching**: Cache inteligente para reduzir leituras no Firestore.
+  - **Batch Queries**: Eliminação do problema N+1 em listagens pesadas.
 
 ---
 
-## 📁 Estrutura do Monorepo
+## 📁 Estrutura do Projeto
 
 ```text
-MedPark_Saas/
-├── frontend/           # Aplicação React (Cloudflare Pages)
+MedPark_Firebase/
+├── frontend/           # Aplicação React Principal
 │   ├── src/
-│   │   ├── components/ # Componentes de UI e Layout
-│   │   ├── pages/      # Páginas da aplicação
-│   │   └── services/   # Integração com o Backend (Axios)
-│   └── public/         # Ativos estáticos
-├── backend/            # API Hono (Cloudflare Workers)
-│   ├── src/
-│   │   ├── routes/     # Rotas da API refatoradas para Hono
-│   │   └── middleware/ # Autenticação e Guards Edge-compatible
-│   ├── prisma/         # Esquema e Migrações (Edge Client)
-│   └── wrangler.toml   # Configuração de deploy Cloudflare
-└── package.json        # Configuração de workspaces NPM
+│   │   ├── components/ # UI e Layout Modular
+│   │   ├── pages/      # Portarias (GateA, GateE), Dashboards
+│   │   ├── services/   # Integração Firestore (Vacancy, Employee, Vehicle)
+│   │   └── lib/        # Configuração do Firebase SDK
+├── backend/            # (Legado/Em Migração) API Hono original
+├── .env                # Variáveis de ambiente (API Keys do Firebase)
+└── firebase.json       # Configuração de Hosting e Functions
 ```
 
 ---
@@ -65,37 +63,34 @@ MedPark_Saas/
 
 ### Pré-requisitos
 - Node.js (v20 ou superior)
-- NPM (v7+ para suporte a workspaces)
+- Firebase CLI (`npm install -g firebase-tools`)
 
 ### Configuração e Desenvolvimento
-1. **Instalação Global**:
+1. **Instalação**:
    ```bash
    npm install
    ```
-
-2. **Backend**:
-   ```bash
-   cd backend
-   npm run dev
+2. **Variáveis de Ambiente**:
+   Crie um arquivo `.env` na pasta `frontend/` com suas chaves do Firebase:
+   ```env
+   VITE_FIREBASE_API_KEY=...
+   VITE_FIREBASE_AUTH_DOMAIN=...
+   VITE_FIREBASE_PROJECT_ID=...
    ```
-
-3. **Frontend**:
+3. **Execução Local**:
    ```bash
    cd frontend
    npm run dev
    ```
 
-### Build e Deploy
-O projeto está preparado para o ecossistema Cloudflare:
-
-- **Frontend**: Deploy automático via **Cloudflare Pages** conectando à pasta `/frontend`.
-- **Backend**: Deploy via **Wrangler** a partir da pasta `/backend`:
-  ```bash
-  npx wrangler deploy
-  ```
+### Deploy
+```bash
+# Frontend
+firebase deploy --only hosting
+```
 
 ---
 
 ## 👤 Autor
 **Danyllo Jonathas Cunha Pereira**  
-*Atualizado em: 18/03/2026*
+*Atualizado em: 20/03/2026*
