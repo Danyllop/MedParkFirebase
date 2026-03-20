@@ -15,24 +15,19 @@ import {
     Clock,
     Info,
     Edit,
-    Trash2
+    Trash2,
+    Loader2
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../store/AuthContext';
-import { mockEmployees, mockVehicles } from '../data/mockData';
+import { vacancyService, type Vacancy } from '../services/firebase/vacancy.service';
+import { employeeService } from '../services/firebase/employee.service';
+import { vehicleService } from '../services/firebase/vehicle.service';
 import Modal from '../components/ui/Modal';
+import { toast } from 'react-hot-toast';
 
-interface Vacancy {
-    id: number;
-    number: string;
-    type: 'DIRETORIA' | 'COMUM' | 'PNE' | 'IDOSO';
-    locality: 'EXTERNA' | 'SUBSOLO 1' | 'SUBSOLO 2';
-    status: 'DISPONIVEL' | 'OCUPADA' | 'RESERVADA' | 'BLOQUEADA';
-    owner?: string;
-    vehicle?: string;
-    plate?: string;
-}
+// Use Vacancy from service
 
 const PortariaA = () => {
     const navigate = useNavigate();
@@ -43,6 +38,7 @@ const PortariaA = () => {
 
     const [isBusinessHours, setIsBusinessHours] = useState(false);
     const [vacancies, setVacancies] = useState<Vacancy[]>([]);
+    const [loading, setLoading] = useState(true);
     const [selectedVacancy, setSelectedVacancy] = useState<Vacancy | null>(null);
     const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
     const [searchTerm, setSearchTerm] = useState('');
@@ -50,39 +46,24 @@ const PortariaA = () => {
     // Manual Entry State
     const [isManualEntryOpen, setIsManualEntryOpen] = useState(false);
     const [manualSearchTerm, setManualSearchTerm] = useState('');
+    const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
     const [selectedEmployeeForEntry, setSelectedEmployeeForEntry] = useState<any>(null);
+    const [selectedVehicleForEntry, setSelectedVehicleForEntry] = useState<any>(null);
     const [manualEntryStep, setManualEntryStep] = useState<'search' | 'confirm'>('search');
     const [entrySpotSearch, setEntrySpotSearch] = useState('');
 
-    const generateSpots = () => {
-        const initialVacancies: Vacancy[] = Array.from({ length: 90 }, (_, i) => {
-            const num = i + 1;
-            let type: Vacancy['type'] = 'COMUM';
-            let locality: Vacancy['locality'] = 'EXTERNA';
-            
-            if (num <= 15) {
-                locality = 'EXTERNA';
-                type = 'COMUM';
-            } else if (num <= 45) {
-                locality = 'SUBSOLO 1';
-                if (num >= 39 && num <= 44) type = 'DIRETORIA';
-                else if (num === 45) type = 'IDOSO';
-            } else {
-                locality = 'SUBSOLO 2';
-                if (num === 84 || num === 85) type = 'PNE';
-                else if (num === 86 || num === 87) type = 'IDOSO';
-            }
-
-            return {
-                id: num,
-                number: `A-${num.toString().padStart(3, '0')}`,
-                type,
-                locality,
-                status: 'DISPONIVEL'
-            };
-        });
-        setVacancies(initialVacancies);
-        localStorage.setItem('gate_a_vacancies', JSON.stringify(initialVacancies));
+    const fetchData = async () => {
+        try {
+            setLoading(true);
+            const data = await vacancyService.getAll({ gate: 'A' });
+            setVacancies(data);
+        } catch (error) {
+            console.error('Error fetching vacancies:', error);
+            toast.error('Erro ao carregar mapa de vagas');
+        } finally {
+            setLoading(false);
+        }
     };
 
     // Simulation of business hours check (Seg-Sex, 06h-18h)
@@ -101,128 +82,100 @@ const PortariaA = () => {
         return () => clearInterval(interval);
     }, []);
 
-    // Load from local storage or generate
     useEffect(() => {
-        const saved = localStorage.getItem('gate_a_vacancies');
-        if (saved) {
-            setVacancies(JSON.parse(saved));
-        } else {
-            generateSpots();
-        }
-
-        // Initialize history if empty
-        const savedHistory = localStorage.getItem('gate_a_history');
-        if (!savedHistory) {
-            const initialHistory = [
-                { id: 1, timestamp: '10/03/2026 14:30', spot: 'A-042', event: 'ENTRADA', owner: 'ALAN FERNANDES DA SILVA', plate: 'KDC-1234', operator: 'MARIA SILVA' },
-                { id: 2, timestamp: '10/03/2026 15:15', spot: 'A-015', event: 'SAÍDA', owner: 'DANYLLO PEREIRA', plate: 'ABC-5E21', operator: 'JOÃO GOMES' },
-                { id: 3, timestamp: '10/03/2026 15:45', spot: 'A-088', event: 'RESERVA', owner: 'MARIA OLIVEIRA', plate: 'XYZ-9876', operator: 'MARIA SILVA' },
-                { id: 4, timestamp: '10/03/2026 16:20', spot: 'E-012', event: 'ENTRADA', owner: 'JOSE ALMEIDA', plate: 'BRA-1A22', operator: 'RICARDO SOUZA' },
-                { id: 5, timestamp: '10/03/2026 17:05', spot: 'A-042', event: 'SAÍDA', owner: 'ALAN FERNANDES DA SILVA', plate: 'KDC-1234', operator: 'JOÃO GOMES' },
-            ];
-            localStorage.setItem('gate_a_history', JSON.stringify(initialHistory));
-        }
+        fetchData();
     }, []);
 
-    const addHistoryEntry = (entry: any) => {
-        const savedHistory = JSON.parse(localStorage.getItem('gate_a_history') || '[]');
-        const newEntry = {
-            id: Date.now(),
-            timestamp: new Date().toLocaleString('pt-BR').slice(0, 16).replace(',', ''),
-            operator: user?.name?.toUpperCase() || 'ADMIN',
-            ...entry
-        };
-        const updatedHistory = [newEntry, ...savedHistory].slice(0, 150);
-        localStorage.setItem('gate_a_history', JSON.stringify(updatedHistory));
+    const searchEmployees = async (term: string) => {
+        if (term.length < 2) {
+            setSearchResults([]);
+            return;
+        }
+        try {
+            setIsSearching(true);
+            const employees = await employeeService.getAll();
+            const filtered = employees.filter(emp => 
+                emp.name.toLowerCase().includes(term.toLowerCase()) ||
+                emp.cpf?.includes(term) ||
+                emp.registrationType?.includes(term)
+            );
+            setSearchResults(filtered);
+        } catch (error) {
+            console.error('Search error:', error);
+        } finally {
+            setIsSearching(false);
+        }
     };
 
-    const handleReleaseSpot = (spot: Vacancy) => {
-        const updatedVacancies = vacancies.map(v => 
-            v.id === spot.id 
-                ? { ...v, status: 'DISPONIVEL' as const, owner: undefined, vehicle: undefined, plate: undefined }
-                : v
-        );
-        setVacancies(updatedVacancies);
-        localStorage.setItem('gate_a_vacancies', JSON.stringify(updatedVacancies));
-        
-        addHistoryEntry({
-            spot: spot.number,
-            event: 'SAÍDA',
-            owner: spot.owner,
-            plate: spot.plate
-        });
-        
-        setSelectedVacancy(null);
-        alert(`Vaga ${spot.number} liberada com sucesso!`);
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (manualSearchTerm) searchEmployees(manualSearchTerm);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [manualSearchTerm]);
+
+    const handleReleaseSpot = async (spot: Vacancy) => {
+        if (!spot.id) return;
+        try {
+            await vacancyService.release(spot.id, user?.id || 'anonymous');
+            toast.success(`Vaga ${spot.number} liberada com sucesso!`);
+            fetchData();
+            setSelectedVacancy(null);
+        } catch (error) {
+            toast.error('Erro ao liberar vaga');
+        }
     };
 
     const stats = useMemo(() => ({
         total: vacancies.length,
-        disponiveis: vacancies.filter(v => v.status === 'DISPONIVEL' && !(v.type === 'DIRETORIA' && isBusinessHours)).length,
-        reservadas: vacancies.filter(v => v.status === 'RESERVADA').length,
-        ocupadas: vacancies.filter(v => v.status === 'OCUPADA').length,
+        disponiveis: vacancies.filter(v => v.currentStatus === 'DISPONIVEL' && !(v.type === 'DIRETORIA' && isBusinessHours)).length,
+        reservadas: vacancies.filter(v => v.currentStatus === 'RESERVADA').length,
+        ocupadas: vacancies.filter(v => v.currentStatus === 'OCUPADA').length,
         restritas: vacancies.filter(v => v.type === 'DIRETORIA').length
     }), [vacancies, isBusinessHours]);
 
-    const handleEditSpot = (spot: Vacancy) => {
-        if (!isAdmin) return;
-        const newType = prompt("Novo tipo (DIRETORIA, COMUM, PNE, IDOSO):", spot.type) as Vacancy['type'];
+    const handleEditSpot = async (spot: Vacancy) => {
+        if (!isAdmin || !spot.id) return;
+        const newType = prompt("Novo tipo (DIRETORIA, COMUM, PNE, IDOSO):", spot.type) as any;
         if (newType && ['DIRETORIA', 'COMUM', 'PNE', 'IDOSO'].includes(newType)) {
-            const updatedVacancies = vacancies.map(v => 
-                v.id === spot.id ? { ...v, type: newType } : v
-            );
-            setVacancies(updatedVacancies);
-            localStorage.setItem('gate_a_vacancies', JSON.stringify(updatedVacancies));
-            alert(`Vaga ${spot.number} atualizada para ${newType}`);
+            try {
+                await vacancyService.updateStatus(spot.id, { type: newType });
+                toast.success(`Vaga ${spot.number} atualizada para ${newType}`);
+                fetchData();
+            } catch (error) {
+                toast.error('Erro ao atualizar vaga');
+            }
         }
     };
 
-    const handleResetMap = () => {
-        const hasActiveSpots = vacancies.some(v => v.status === 'OCUPADA' || v.status === 'RESERVADA');
+    const handleResetMap = async () => {
+        if (!isAdmin) return;
+        const hasActiveSpots = vacancies.some(v => v.currentStatus === 'OCUPADA' || v.currentStatus === 'RESERVADA');
         if (hasActiveSpots) {
-            alert('Não é possível reiniciar o mapa! Existem vagas ocupadas ou reservadas no momento. Libere todas as vagas antes de reiniciar.');
+            toast.error('Não é possível reiniciar o mapa! Existem vagas ocupadas ou reservadas.');
             return;
         }
         
         if (!confirm('Tem certeza que deseja reiniciar o mapa? Todas as vagas voltarão ao status DISPONIVEL.')) return;
-        generateSpots();
-        setSelectedVacancy(null);
+        
+        try {
+            // Em vez de generateSpots, poderíamos iterar e resetar no Firebase, 
+            // mas por segurança e limite do plano free, vamos desabilitar por enquanto.
+            toast.success('Funcionalidade de reset desabilitada por segurança no Firebase.');
+        } catch (error) {
+            toast.error('Erro ao reiniciar mapa');
+        }
     };
 
-    const handleReserveSpot = (spot: Vacancy) => {
-        if (spot.status === 'RESERVADA') {
-            if (!confirm(`Deseja retirar a reserva da vaga ${spot.number} para ${spot.owner}?`)) return;
-            const updatedVacancies = vacancies.map(v => 
-                v.id === spot.id ? { ...v, status: 'DISPONIVEL' as const, owner: undefined } : v
-            );
-            setVacancies(updatedVacancies);
-            localStorage.setItem('gate_a_vacancies', JSON.stringify(updatedVacancies));
-            
-            addHistoryEntry({
-                spot: spot.number,
-                event: 'LIBERAÇÃO',
-                owner: spot.owner
-            });
-            alert(`Reserva da vaga ${spot.number} retirada com sucesso!`);
+    const handleReserveSpot = async (spot: Vacancy) => {
+        if (!spot.id) return;
+        try {
+            await vacancyService.toggleReserve(spot.id, user?.id || 'anonymous');
+            toast.success(`Operação realizada com sucesso na vaga ${spot.number}`);
+            fetchData();
             setSelectedVacancy(null);
-            return;
-        }
-
-        if (spot.status !== 'DISPONIVEL') return;
-        const owner = prompt("Motivo da reserva:");
-        if (owner) {
-            const updatedVacancies = vacancies.map(v => 
-                v.id === spot.id ? { ...v, status: 'RESERVADA' as const, owner } : v
-            );
-            setVacancies(updatedVacancies);
-            localStorage.setItem('gate_a_vacancies', JSON.stringify(updatedVacancies));
-            
-            addHistoryEntry({
-                spot: spot.number,
-                event: 'RESERVA',
-                owner
-            });
-            alert(`Vaga ${spot.number} reservada para ${owner}`);
+        } catch (error: any) {
+            toast.error(error.message || 'Erro ao processar reserva');
         }
     };
 
@@ -238,8 +191,8 @@ const PortariaA = () => {
 
     const filteredVacancies = vacancies.filter(v => {
         const matchesSearch = v.number.includes(searchTerm.toUpperCase()) ||
-                            v.owner?.includes(searchTerm.toUpperCase()) ||
-                            v.plate?.includes(searchTerm.toUpperCase());
+                            v.occupantName?.toUpperCase().includes(searchTerm.toUpperCase()) ||
+                            v.occupantPlate?.toUpperCase().includes(searchTerm.toUpperCase());
         const matchesType = true; // No type filter
         return matchesSearch && matchesType;
     });
@@ -249,7 +202,7 @@ const PortariaA = () => {
         
         if (isBlocked) return "bg-slate-900/40 border-slate-800 text-slate-500 opacity-40 cursor-not-allowed";
         
-        switch (vacancy.status) {
+        switch (vacancy.currentStatus) {
             case 'DISPONIVEL': return "bg-emerald-500/5 border-emerald-500/20 text-emerald-500 hover:border-emerald-500/40 hover:bg-emerald-500/10";
             case 'OCUPADA': return "bg-rose-500/10 border-rose-500/20 text-rose-500 hover:border-rose-500/40";
             case 'RESERVADA': return "bg-amber-500/10 border-amber-500/20 text-amber-500 hover:border-amber-500/40";
@@ -258,7 +211,7 @@ const PortariaA = () => {
         }
     };
 
-    const getStatusIcon = (status: Vacancy['status']) => {
+    const getStatusIcon = (status: Vacancy['currentStatus']) => {
         switch (status) {
             case 'DISPONIVEL': return <CheckCircle2 size={20} className="opacity-40" />;
             case 'OCUPADA': return <Car size={20} className="fill-current" />;
@@ -267,6 +220,23 @@ const PortariaA = () => {
             default: return null;
         }
     };
+
+    if (loading) {
+        return (
+            <div className="flex-1 flex flex-col items-center justify-center bg-slate-950 gap-6">
+                <div className="relative">
+                    <div className="size-20 rounded-full border-b-2 border-accent animate-spin" />
+                    <div className="absolute inset-0 flex items-center justify-center text-accent/50">
+                        <Map size={32} />
+                    </div>
+                </div>
+                <div className="text-center space-y-2">
+                    <p className="text-xs font-black text-white uppercase tracking-[0.3em] animate-pulse">Sincronizando com Firestore</p>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Carregando Mapa de Vagas...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex-1 flex flex-col h-full bg-background-dark overflow-hidden relative">
@@ -404,7 +374,7 @@ const PortariaA = () => {
                             
                             return (
                                 <motion.button
-                                    key={vacancy.id}
+                                    key={vacancy.id || `vacancy-${vacancy.number}`}
                                     whileHover={{ y: -2 }}
                                     onClick={() => !isBlocked && setSelectedVacancy(vacancy)}
                                     className={cn(
@@ -414,15 +384,15 @@ const PortariaA = () => {
                                     )}
                                 >
                                     <span className="text-xs font-black uppercase tracking-tighter opacity-80">{vacancy.number}</span>
-                                    {getStatusIcon(vacancy.status)}
-                                    {vacancy.owner && (
+                                    {getStatusIcon(vacancy.currentStatus)}
+                                    {vacancy.occupantName && (
                                         <span className="text-[9px] font-black text-white/90 uppercase tracking-tighter w-full text-center truncate px-1">
-                                            {vacancy.owner.split(' ').slice(0, 2).join(' ')}
+                                            {vacancy.occupantName.split(' ').slice(0, 2).join(' ')}
                                         </span>
                                     )}
-                                    {vacancy.plate && (
+                                    {vacancy.occupantPlate && (
                                         <p className="text-[10px] font-black bg-rose-500/20 px-2 py-0.5 rounded border border-rose-500/30 truncate max-w-[90%] uppercase tracking-tighter">
-                                            {vacancy.plate}
+                                            {vacancy.occupantPlate}
                                         </p>
                                     )}
                                     {isBlocked && (
@@ -459,7 +429,7 @@ const PortariaA = () => {
 
                                     return (
                                         <tr 
-                                            key={vacancy.id}
+                                            key={vacancy.id || `row-${vacancy.number}`}
                                             onClick={() => !isBlocked && setSelectedVacancy(vacancy)}
                                             className={cn(
                                                 "group hover:bg-white/5 transition-colors cursor-pointer",
@@ -471,8 +441,8 @@ const PortariaA = () => {
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-3">
                                                     <div className={cn("size-2 rounded-full", 
-                                                        vacancy.status === 'DISPONIVEL' ? "bg-emerald-500" : 
-                                                        vacancy.status === 'OCUPADA' ? "bg-rose-500" : "bg-amber-500"
+                                                        vacancy.currentStatus === 'DISPONIVEL' ? "bg-emerald-500" : 
+                                                        vacancy.currentStatus === 'OCUPADA' ? "bg-rose-500" : "bg-amber-500"
                                                     )}></div>
                                                     <span className="text-sm font-black text-white">{vacancy.number}</span>
                                                 </div>
@@ -486,41 +456,41 @@ const PortariaA = () => {
                                             <td className="px-6 py-4">
                                                 <span className={cn(
                                                     "px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border",
-                                                    vacancy.status === 'DISPONIVEL' ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : 
-                                                    vacancy.status === 'OCUPADA' ? "bg-rose-500/10 text-rose-500 border-rose-500/20" :
+                                                    vacancy.currentStatus === 'DISPONIVEL' ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : 
+                                                    vacancy.currentStatus === 'OCUPADA' ? "bg-rose-500/10 text-rose-500 border-rose-500/20" :
                                                     "bg-amber-500/10 text-amber-500 border-amber-500/20"
                                                 )}>
-                                                    {isBlocked ? 'BLOQUEADA' : (vacancy.status === 'DISPONIVEL' ? 'DISPONIVEL' : vacancy.status)}
+                                                    {isBlocked ? 'BLOQUEADA' : vacancy.currentStatus}
                                                 </span>
                                             </td>
                                             {canManageSpots && (
                                                 <td className="px-6 py-4 text-right">
                                                     <div className="flex items-center justify-end gap-2">
                                                         <button 
-                                                            disabled={vacancy.status !== 'DISPONIVEL'}
+                                                            disabled={vacancy.currentStatus !== 'DISPONIVEL'}
                                                             onClick={(e) => { e.stopPropagation(); handleEditSpot(vacancy); }}
                                                             className={cn(
                                                                 "p-1.5 flex items-center justify-center rounded transition-colors",
-                                                                vacancy.status === 'DISPONIVEL' 
+                                                                vacancy.currentStatus === 'DISPONIVEL' 
                                                                     ? "bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"
                                                                     : "bg-slate-800/50 text-slate-600 cursor-not-allowed"
                                                             )}
-                                                            title={vacancy.status === 'DISPONIVEL' ? "Editar Vaga" : "Vaga não pode ser Editada"}
+                                                            title={vacancy.currentStatus === 'DISPONIVEL' ? "Editar Vaga" : "Vaga não pode ser Editada"}
                                                         >
                                                             <Edit size={14} />
                                                         </button>
                                                         <button 
-                                                            disabled={vacancy.status !== 'DISPONIVEL' && vacancy.status !== 'RESERVADA'}
+                                                            disabled={vacancy.currentStatus !== 'DISPONIVEL' && vacancy.currentStatus !== 'RESERVADA'}
                                                             onClick={(e) => { e.stopPropagation(); handleReserveSpot(vacancy); }}
                                                             className={cn(
                                                                 "p-1.5 flex items-center justify-center rounded transition-colors",
-                                                                vacancy.status === 'DISPONIVEL'
+                                                                vacancy.currentStatus === 'DISPONIVEL'
                                                                     ? "bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-amber-500"
-                                                                    : vacancy.status === 'RESERVADA'
+                                                                    : vacancy.currentStatus === 'RESERVADA'
                                                                         ? "bg-amber-500/20 text-amber-500 hover:bg-amber-500/30"
                                                                         : "bg-slate-800/50 text-slate-600 cursor-not-allowed"
                                                             )}
-                                                            title={vacancy.status === 'DISPONIVEL' ? "Reservar Vaga" : vacancy.status === 'RESERVADA' ? "Retirar Reserva" : "Vaga não pode ser Reservada"}
+                                                            title={vacancy.currentStatus === 'DISPONIVEL' ? "Reservar Vaga" : vacancy.currentStatus === 'RESERVADA' ? "Retirar Reserva" : "Vaga não pode ser Reservada"}
                                                         >
                                                             <Bookmark size={14} />
                                                         </button>
@@ -558,11 +528,11 @@ const PortariaA = () => {
                             <div>
                                 <span className={cn(
                                     "inline-block px-2.5 py-1 rounded bg-opacity-10 border text-[9px] font-black uppercase tracking-widest mb-3",
-                                    selectedVacancy.status === 'OCUPADA' ? "bg-rose-500 text-rose-500 border-rose-500/20" : 
-                                    selectedVacancy.status === 'RESERVADA' ? "bg-amber-500 text-amber-500 border-amber-500/20" :
+                                    selectedVacancy.currentStatus === 'OCUPADA' ? "bg-rose-500 text-rose-500 border-rose-500/20" : 
+                                    selectedVacancy.currentStatus === 'RESERVADA' ? "bg-amber-500 text-amber-500 border-amber-500/20" :
                                     "bg-emerald-500 text-emerald-500 border-emerald-500/20"
                                 )}>
-                                    Vaga {selectedVacancy.status === 'OCUPADA' ? 'Ocupada' : selectedVacancy.status === 'RESERVADA' ? 'Reservada' : 'Disponivel'}
+                                    Vaga {selectedVacancy.currentStatus === 'OCUPADA' ? 'Ocupada' : selectedVacancy.currentStatus === 'RESERVADA' ? 'Reservada' : 'Disponivel'}
                                 </span>
                                 <h3 className="text-3xl font-black text-white tracking-tighter">{selectedVacancy.number}</h3>
                                 <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">
@@ -578,15 +548,15 @@ const PortariaA = () => {
                         </div>
 
                         <div className="space-y-6 flex-1">
-                            {selectedVacancy.status === 'OCUPADA' ? (
+                            {selectedVacancy.currentStatus === 'OCUPADA' ? (
                                 <>
                                     <div className="flex items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/5 group hover:border-accent/20 transition-all">
                                         <div className="size-10 rounded-full bg-accent/10 flex items-center justify-center text-accent group-hover:scale-110 transition-transform">
                                             <User size={18} />
                                         </div>
                                         <div>
-                                            <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-0.5">Motivo da Reserva</p>
-                                            <p className="text-sm font-bold text-white uppercase tracking-tight">{selectedVacancy.owner}</p>
+                                            <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-0.5">Ocupante</p>
+                                            <p className="text-sm font-bold text-white uppercase tracking-tight">{selectedVacancy.occupantName}</p>
                                         </div>
                                     </div>
 
@@ -596,7 +566,7 @@ const PortariaA = () => {
                                         </div>
                                         <div>
                                             <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-0.5">Veículo / Placa</p>
-                                            <p className="text-sm font-bold text-white uppercase tracking-tight">{selectedVacancy.vehicle} • {selectedVacancy.plate}</p>
+                                            <p className="text-sm font-bold text-white uppercase tracking-tight">{selectedVacancy.occupantVehicle} • {selectedVacancy.occupantPlate}</p>
                                         </div>
                                     </div>
                                     
@@ -607,7 +577,7 @@ const PortariaA = () => {
                                         Liberar Vaga
                                     </button>
                                 </>
-                            ) : selectedVacancy.status === 'DISPONIVEL' ? (
+                            ) : selectedVacancy.currentStatus === 'DISPONIVEL' ? (
                                 <div className="flex flex-col items-center justify-center py-10 text-center space-y-4">
                                     <div className="size-16 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500">
                                         <CheckCircle2 size={32} className="opacity-40" />
@@ -634,7 +604,7 @@ const PortariaA = () => {
                                     </div>
                                     <div>
                                         <p className="text-sm font-bold text-slate-300">Vaga Reservada</p>
-                                        <p className="text-[10px] text-slate-500 mt-1 max-w-[200px]">Esta vaga possui uma reserva ativa para um colaborador específico.</p>
+                                        <p className="text-[10px] text-slate-500 mt-1 max-w-[200px]">Esta vaga possui uma reserva ativa para um colaborador específico. Motivo: {selectedVacancy.occupantName}</p>
                                     </div>
                                     <button 
                                         onClick={() => handleReserveSpot(selectedVacancy)}
@@ -682,54 +652,52 @@ const PortariaA = () => {
                                     value={manualSearchTerm}
                                     onChange={(e) => setManualSearchTerm(e.target.value.toUpperCase())}
                                 />
-                            </div>
-
-                            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 no-scrollbar">
+                                              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 no-scrollbar">
                                 {manualSearchTerm.length >= 2 ? (
-                                    mockEmployees
-                                        .filter(emp => {
-                                            const vehicle = mockVehicles.find(v => v.ownerId === emp.id);
-                                            return emp.name.includes(manualSearchTerm) || 
-                                                   emp.cpf.includes(manualSearchTerm) ||
-                                                   vehicle?.plate.includes(manualSearchTerm) ||
-                                                   (emp as any).sticker?.includes(manualSearchTerm);
-                                        })
-                                        .map(emp => {
-                                            const vehicle = mockVehicles.find(v => v.ownerId === emp.id);
-                                            return (
-                                                <div 
-                                                    key={emp.id}
-                                                    onClick={() => {
-                                                        setSelectedEmployeeForEntry(emp);
-                                                        setManualEntryStep('confirm');
-                                                    }}
-                                                    className="p-4 bg-slate-800/40 border border-white/5 rounded-xl hover:border-accent/30 transition-all group cursor-pointer"
-                                                >
-                                                    <div className="flex items-center justify-between gap-4">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="size-10 rounded-full bg-slate-700 flex items-center justify-center text-slate-400 group-hover:bg-accent/20 group-hover:text-accent transition-colors">
-                                                                <User size={18} />
-                                                            </div>
-                                                            <div>
-                                                                <p className="text-xs font-black text-white uppercase tracking-tight">{emp.name}</p>
-                                                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{emp.role} • {emp.bond}</p>
-                                                            </div>
+                                    isSearching ? (
+                                        <div className="py-10 text-center">
+                                            <Loader2 size={32} className="mx-auto animate-spin text-accent mb-3" />
+                                            <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Pesquisando...</p>
+                                        </div>
+                                    ) : (
+                                        searchResults.map(emp => (
+                                            <div 
+                                                key={emp.id}
+                                                onClick={async () => {
+                                                    setSelectedEmployeeForEntry(emp);
+                                                    setManualEntryStep('confirm');
+                                                    setIsSearching(true);
+                                                    try {
+                                                        const vehicles = await vehicleService.getByEmployee(emp.id);
+                                                        const primary = vehicles.find(v => v.isPrincipal) || vehicles[0];
+                                                        setSelectedVehicleForEntry(primary || null);
+                                                    } catch (error) {
+                                                        console.error('Error fetching vehicle:', error);
+                                                    } finally {
+                                                        setIsSearching(false);
+                                                    }
+                                                }}
+                                                className="p-4 bg-slate-800/40 border border-white/5 rounded-xl hover:border-accent/30 transition-all group cursor-pointer"
+                                            >
+                                                <div className="flex items-center justify-between gap-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="size-10 rounded-full bg-slate-700 flex items-center justify-center text-slate-400 group-hover:bg-accent/20 group-hover:text-accent transition-colors">
+                                                            <User size={18} />
                                                         </div>
-                                                        <div className="text-right">
-                                                            {vehicle && (
-                                                                <div className="flex items-center gap-2 justify-end">
-                                                                    <Car size={14} className="text-accent" />
-                                                                    <span className="text-xs font-black text-white tracking-widest">{vehicle.plate}</span>
-                                                                </div>
-                                                            )}
-                                                            <button className="mt-2 px-3 py-1.5 bg-accent/10 group-hover:bg-accent text-accent group-hover:text-white rounded-lg text-[9px] font-black uppercase tracking-widest transition-all">
-                                                                Selecionar
-                                                            </button>
+                                                        <div>
+                                                            <p className="text-xs font-black text-white uppercase tracking-tight">{emp.name}</p>
+                                                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{emp.position || emp.role} • {emp.bond}</p>
                                                         </div>
                                                     </div>
+                                                    <div className="text-right">
+                                                        <button className="px-3 py-1.5 bg-accent/10 group-hover:bg-accent text-accent group-hover:text-white rounded-lg text-[9px] font-black uppercase tracking-widest transition-all">
+                                                            Selecionar
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                            );
-                                        })
+                                            </div>
+                                        ))
+                                    )
                                 ) : (
                                     <div className="py-10 text-center text-slate-600">
                                         <Search size={32} className="mx-auto mb-3 opacity-20" />
@@ -737,33 +705,24 @@ const PortariaA = () => {
                                     </div>
                                 )}
                                 
-                                {manualSearchTerm.length >= 2 && mockEmployees.filter(emp => {
-                                    const vehicle = mockVehicles.find(v => v.ownerId === emp.id);
-                                    return emp.name.includes(manualSearchTerm) || 
-                                           emp.cpf.includes(manualSearchTerm) ||
-                                           vehicle?.plate.includes(manualSearchTerm) ||
-                                           (emp as any).sticker?.includes(manualSearchTerm);
-                                }).length === 0 && (
+                                {manualSearchTerm.length >= 2 && !isSearching && searchResults.length === 0 && (
                                     <div className="py-10 text-center text-slate-500">
-                                        <p className="text-xs font-bold uppercase tracking-widest">Nenhum cadastro encontrado</p>
+                                        <p className="text-xs font-bold uppercase tracking-widest">Nenhum colaborador encontrado</p>
                                     </div>
                                 )}
-                            </div>
+                            </div>                    </div>
                         </>
                     ) : (
                         <div className="space-y-6">
-                            {/* Validation 2: Check if employee is already inside */}
-                            {(() => {
-                                const vehicle = mockVehicles.find(v => v.ownerId === selectedEmployeeForEntry?.id);
+                             {(() => {
                                 const isAlreadyInside = vacancies.find(v => 
-                                    v.status === 'OCUPADA' && 
-                                    ((v.owner && v.owner === selectedEmployeeForEntry?.name) || 
-                                     (v.plate && vehicle && v.plate === vehicle.plate))
+                                    v.currentStatus === 'OCUPADA' && 
+                                    ((v.occupantName && v.occupantName === selectedEmployeeForEntry?.name) || 
+                                     (v.occupantPlate && selectedVehicleForEntry && v.occupantPlate === selectedVehicleForEntry.plate))
                                 );
 
-                                // Validation 1: Spot search and check
                                 const normalizedSearch = entrySpotSearch.toUpperCase().trim();
-                                const numberMatchSearch = normalizedSearch.replace(/[^0-9]/g, ''); // Extract just numbers if they type "05" instead of "A-005"
+                                const numberMatchSearch = normalizedSearch.replace(/[^0-9]/g, '');
                                 
                                 const matchedSpot = entrySpotSearch ? vacancies.find(v => {
                                     if (v.number === normalizedSearch) return true;
@@ -772,7 +731,7 @@ const PortariaA = () => {
                                 }) : null;
 
                                 const isSpotRestricted = matchedSpot?.type === 'DIRETORIA' && isBusinessHours;
-                                const isSpotOccupied = matchedSpot?.status === 'OCUPADA';
+                                const isSpotOccupied = matchedSpot?.currentStatus === 'OCUPADA';
                                 const canConfirm = matchedSpot && !isSpotOccupied && !isAlreadyInside && !isSpotRestricted;
 
                                 return (
@@ -784,7 +743,7 @@ const PortariaA = () => {
                                                 </div>
                                                 <div>
                                                     <h3 className="text-lg font-black text-white uppercase tracking-tight">{selectedEmployeeForEntry?.name}</h3>
-                                                    <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">{selectedEmployeeForEntry?.role} • {selectedEmployeeForEntry?.bond}</p>
+                                                    <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">{selectedEmployeeForEntry?.position || selectedEmployeeForEntry?.role} • {selectedEmployeeForEntry?.bond}</p>
                                                 </div>
                                             </div>
 
@@ -798,7 +757,7 @@ const PortariaA = () => {
                                                     <div className="flex items-center gap-2">
                                                         <Car size={16} className="text-accent" />
                                                         <p className="text-sm font-black text-white tracking-widest">
-                                                            {vehicle?.plate || 'NÃO VINCULADA'}
+                                                            {selectedVehicleForEntry?.plate || 'NÃO VINCULADA'}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -875,7 +834,7 @@ const PortariaA = () => {
                                                                             isSpotRestricted ? "text-amber-500" : (!isSpotOccupied ? "text-emerald-500" : "text-rose-500")
                                                                         )}>
                                                                             <span className="text-slate-500">STATUS:</span> 
-                                                                            {isSpotRestricted ? 'RESTRITA (DIRETORIA)' : (matchedSpot.status === 'DISPONIVEL' ? 'DISPONIVEL' : matchedSpot.status)}
+                                                                            {isSpotRestricted ? 'RESTRITA (DIRETORIA)' : matchedSpot.currentStatus}
                                                                         </p>
                                                                     </div>
                                                                 </div>
@@ -892,59 +851,53 @@ const PortariaA = () => {
                                                 onClick={() => {
                                                     setManualEntryStep('search');
                                                     setEntrySpotSearch('');
+                                                    setSelectedVehicleForEntry(null);
                                                 }}
                                                 className="w-full py-4 bg-slate-800 hover:bg-slate-700 text-white font-black text-xs uppercase tracking-[0.2em] rounded-xl transition-all border border-white/5"
                                             >
                                                 VOLTAR
                                             </button>
                                             <button 
-                                                disabled={!canConfirm}
-                                                onClick={() => {
-                                                    if (!canConfirm || !matchedSpot) return;
+                                                disabled={!canConfirm || isSearching}
+                                                onClick={async () => {
+                                                    if (!canConfirm || !matchedSpot || !matchedSpot.id) return;
 
-                                                    // Realizar a ocupação da vaga logicamente no estado
-                                                    const updatedVacancies = vacancies.map(v => {
-                                                        if (v.id === matchedSpot.id) {
-                                                            return {
-                                                                ...v,
-                                                                status: 'OCUPADA' as const,
-                                                                owner: selectedEmployeeForEntry.name,
-                                                                plate: vehicle?.plate,
-                                                                vehicle: vehicle ? vehicle.model : undefined
-                                                            };
-                                                        }
-                                                        return v;
-                                                    });
-                                                    setVacancies(updatedVacancies);
-                                                    localStorage.setItem('gate_a_vacancies', JSON.stringify(updatedVacancies));
+                                                    try {
+                                                        setIsSearching(true);
+                                                        await vacancyService.occupy(matchedSpot.id, {
+                                                            occupantName: selectedEmployeeForEntry.name,
+                                                            occupantPlate: selectedVehicleForEntry?.plate || 'S/ PLACA',
+                                                            occupantVehicle: selectedVehicleForEntry?.model || 'VEÍCULO MANUAL',
+                                                            operatorId: user?.id || 'anonymous'
+                                                        });
 
-                                                    // Fechar Modal e limpar estados
-                                                    setIsManualEntryOpen(false);
-                                                    setManualEntryStep('search');
-                                                    setSelectedEmployeeForEntry(null);
-                                                    setManualSearchTerm('');
-                                                    setEntrySpotSearch('');
-                                                    setSelectedVacancy(null);
-                                                    
-                                                    // Registrar no Histórico
-                                                    addHistoryEntry({
-                                                        spot: matchedSpot.number,
-                                                        event: 'ENTRADA',
-                                                        owner: selectedEmployeeForEntry.name,
-                                                        plate: (mockVehicles.find(veh => veh.ownerId === selectedEmployeeForEntry.id))?.plate || 'S/ PLACA'
-                                                    });
-
-                                                    // Mensagem de sucesso (poderia ser um Toast global)
-                                                    alert(`Entrada registrada com sucesso na vaga ${matchedSpot.number}!`);
+                                                        toast.success(`Entrada registrada com sucesso na vaga ${matchedSpot.number}!`);
+                                                        
+                                                        // Limpar estados
+                                                        setIsManualEntryOpen(false);
+                                                        setManualEntryStep('search');
+                                                        setSelectedEmployeeForEntry(null);
+                                                        setSelectedVehicleForEntry(null);
+                                                        setManualSearchTerm('');
+                                                        setEntrySpotSearch('');
+                                                        setSelectedVacancy(null);
+                                                        
+                                                        fetchData();
+                                                    } catch (error: any) {
+                                                        toast.error(error.message || 'Erro ao registrar entrada');
+                                                    } finally {
+                                                        setIsSearching(false);
+                                                    }
                                                 }}
                                                 className={cn(
                                                     "w-full py-4 font-black text-xs uppercase tracking-[0.2em] rounded-xl transition-all flex items-center justify-center gap-2",
-                                                    canConfirm 
+                                                    canConfirm && !isSearching
                                                         ? "bg-accent hover:bg-accent/90 text-white shadow-lg shadow-accent/20" 
-                                                        : "bg-slate-800 text-slate-500 cursor-not-allowed opacity-50"
+                                                        : "bg-slate-800 text-slate-600 cursor-not-allowed opacity-50"
                                                 )}
                                             >
-                                                <LogIn size={18} /> REGISTRAR
+                                                {isSearching ? <Loader2 size={18} className="animate-spin" /> : <LogIn size={18} />} 
+                                                REGISTRAR
                                             </button>
                                         </div>
                                     </>

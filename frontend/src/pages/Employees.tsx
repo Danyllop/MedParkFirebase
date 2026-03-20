@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Star,
     StarOff,
@@ -17,13 +17,16 @@ import Modal from '../components/ui/Modal';
 import EmployeeForm from '../components/forms/EmployeeForm';
 import VehicleForm from '../components/forms/VehicleForm';
 import { cn } from '../lib/utils';
-import { mockEmployees, mockVehicles } from '../data/mockData';
+import { employeeService } from '../services/firebase/employee.service';
+import { vehicleService } from '../services/firebase/vehicle.service';
+import { toast } from 'react-hot-toast';
 
 const Employees = () => {
     const [view, setView] = useState<'employees' | 'vehicles'>('employees');
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [employees, setEmployees] = useState(mockEmployees);
-    const [vehicles, setVehicles] = useState(mockVehicles);
+    const [employees, setEmployees] = useState<any[]>([]);
+    const [vehicles, setVehicles] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
     const [selectedItem, setSelectedItem] = useState<any>(null);
     const [vehicleFilter, setVehicleFilter] = useState<'total' | 'principal' | 'secundario'>('total');
     const [statusFilter, setStatusFilter] = useState<'TODOS' | 'ATIVO' | 'INATIVO'>('TODOS');
@@ -31,6 +34,27 @@ const Employees = () => {
 
     // Page Search State (Table)
     const [pageSearchTerm, setPageSearchTerm] = useState('');
+
+    useEffect(() => {
+        fetchData();
+    }, []);
+
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const [empData, vehData] = await Promise.all([
+                employeeService.getAll(),
+                vehicleService.getAll()
+            ]);
+            setEmployees(empData);
+            setVehicles(vehData);
+        } catch (error) {
+            console.error("Erro ao buscar dados:", error);
+            toast.error("Erro ao carregar dados.");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleAdd = () => {
         setSelectedItem(null);
@@ -42,12 +66,12 @@ const Employees = () => {
         setIsModalOpen(true);
     };
 
-    const getExpiryClass = (expirationDate?: string, registrationType?: string) => {
+    const getExpiryClass = (expirationDate?: any, registrationType?: string) => {
         if (registrationType !== 'PROVISÓRIO' || !expirationDate) return "";
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const expDate = new Date(expirationDate);
+        const expDate = expirationDate instanceof Date ? expirationDate : new Date(expirationDate);
         expDate.setHours(0, 0, 0, 0);
 
         const diffTime = expDate.getTime() - today.getTime();
@@ -58,53 +82,52 @@ const Employees = () => {
         return "";
     };
 
-    const handleToggleStatus = (employee: any) => {
-        setEmployees(prev => prev.map(emp =>
-            emp.id === employee.id
-                ? { ...emp, status: emp.status === 'ATIVO' ? 'INATIVO' : 'ATIVO' }
-                : emp
-        ));
-    };
-
-    const handleTogglePrincipal = (vehicle: any) => {
-        if (vehicle.isPrincipal) return; // Already principal
-
-        setVehicles(prev => prev.map(v => {
-            if (v.ownerId === vehicle.ownerId) {
-                return { ...v, isPrincipal: v.id === vehicle.id };
-            }
-            return v;
-        }));
-    };
-
-    const handleSubmit = (data: any) => {
-        if (view === 'employees') {
-            if (selectedItem) {
-                setEmployees(prev => prev.map(emp => emp.id === selectedItem.id ? { ...emp, ...data } : emp));
-            } else {
-                setEmployees(prev => [...prev, { ...data, id: prev.length + 1, status: 'ATIVO' }]);
-            }
-        } else {
-            if (selectedItem) {
-                setVehicles(prev => prev.map(veh => {
-                    if (data.isPrincipal && veh.ownerId === data.ownerId && veh.id !== selectedItem.id) {
-                        return { ...veh, isPrincipal: false };
-                    }
-                    if (veh.id === selectedItem.id) {
-                        return { ...veh, ...data };
-                    }
-                    return veh;
-                }));
-            } else {
-                setVehicles(prev => {
-                    const baseVehicles = data.isPrincipal
-                        ? prev.map(v => v.ownerId === data.ownerId ? { ...v, isPrincipal: false } : v)
-                        : prev;
-                    return [...baseVehicles, { ...data, id: prev.length + 1, status: 'ATIVO', createdAt: new Date().toISOString() }];
-                });
-            }
+    const handleToggleStatus = async (employee: any) => {
+        try {
+            const newStatus = employee.status === 'ATIVO' ? 'INATIVO' : 'ATIVO';
+            await employeeService.update(employee.id, { status: newStatus });
+            toast.success(`Funcionário ${newStatus === 'ATIVO' ? 'ativado' : 'inativado'}!`);
+            fetchData();
+        } catch (error) {
+            toast.error("Erro ao alterar status.");
         }
-        setIsModalOpen(false);
+    };
+
+    const handleTogglePrincipal = async (vehicle: any) => {
+        if (vehicle.isPrincipal) return;
+        try {
+            await vehicleService.togglePrincipal(vehicle.id, vehicle.employeeId);
+            toast.success("Veículo principal alterado!");
+            fetchData();
+        } catch (error) {
+            toast.error("Erro ao alterar veículo principal.");
+        }
+    };
+
+    const handleSubmit = async (data: any) => {
+        try {
+            if (view === 'employees') {
+                if (selectedItem) {
+                    await employeeService.update(selectedItem.id, data);
+                    toast.success("Funcionário atualizado!");
+                } else {
+                    await employeeService.create(data);
+                    toast.success("Funcionário cadastrado!");
+                }
+            } else {
+                if (selectedItem) {
+                    await vehicleService.update(selectedItem.id, data);
+                    toast.success("Veículo atualizado!");
+                } else {
+                    await vehicleService.create(data);
+                    toast.success("Veículo cadastrado!");
+                }
+            }
+            setIsModalOpen(false);
+            fetchData();
+        } catch (error: any) {
+            toast.error(error.message || "Erro ao salvar.");
+        }
     };
 
     const employeeColumns: any[] = [
@@ -119,7 +142,7 @@ const Employees = () => {
                 </span>
             )
         },
-        { header: 'ID', accessor: 'id', className: (item: any) => getExpiryClass(item.expirationDate, item.registrationType) },
+        { header: 'ID Registro', accessor: 'id', className: (item: any) => getExpiryClass(item.expirationDate, item.registrationType) },
         {
             header: 'Nome',
             accessor: 'name',
@@ -133,8 +156,8 @@ const Employees = () => {
             )
         },
         { header: 'CPF', accessor: 'cpf', className: (item: any) => getExpiryClass(item.expirationDate, item.registrationType) },
-        { header: 'Cargo', accessor: 'role', className: (item: any) => getExpiryClass(item.expirationDate, item.registrationType) },
-        { header: 'Lotação', accessor: 'location', className: (item: any) => getExpiryClass(item.expirationDate, item.registrationType) },
+        { header: 'Cargo', accessor: 'position', className: (item: any) => getExpiryClass(item.expirationDate, item.registrationType) },
+        { header: 'Lotação', accessor: 'unit', className: (item: any) => getExpiryClass(item.expirationDate, item.registrationType) },
         { header: 'Vínculo', accessor: 'bond', className: (item: any) => getExpiryClass(item.expirationDate, item.registrationType) },
         { header: 'Telefone', accessor: 'phone', className: (item: any) => getExpiryClass(item.expirationDate, item.registrationType) },
     ];
@@ -208,8 +231,8 @@ const Employees = () => {
             header: 'Data de Cadastro',
             accessor: (item: any) => {
                 if (!item.createdAt) return '-';
-                const date = new Date(item.createdAt);
-                const owner = employees.find(e => e.id === item.ownerId);
+                const date = item.createdAt instanceof Date ? item.createdAt : new Date(item.createdAt);
+                const owner = employees.find(e => e.id === (item.ownerId || item.employeeId));
                 return (
                     <div className={cn("flex flex-col text-[10px] leading-tight opacity-80", getExpiryClass(owner?.expirationDate, owner?.registrationType))}>
                         <span className="font-bold">{date.toLocaleDateString('pt-BR')}</span>

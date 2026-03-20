@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../store/AuthContext';
-import api from '../services/api';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { auth, db } from '../lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 const Login = () => {
     const [email, setEmail] = useState('');
@@ -18,27 +20,48 @@ const Login = () => {
         setIsSubmitting(true);
 
         try {
-            const response = await api.post('/auth/login', {
-                email,
-                password
-            });
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            const firebaseUser = userCredential.user;
 
-            const { token, user } = response.data;
+            // Buscar dados adicionais no Firestore
+            const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+            
+            if (userDoc.exists()) {
+                const userData = userDoc.data();
+                const userObj = {
+                    id: firebaseUser.uid,
+                    name: userData.fullName || firebaseUser.displayName || 'Usuário',
+                    email: firebaseUser.email || '',
+                    role: userData.role || 'OPERADOR',
+                    mustChangePassword: userData.mustChangePassword
+                };
 
-            login(token, user);
+                login(userObj);
 
-            if (user.mustChangePassword) {
-                navigate('/change-password');
+                if (userData.mustChangePassword) {
+                    navigate('/change-password');
+                } else {
+                    navigate('/');
+                }
             } else {
-                navigate('/');
+                // Se o documento não existir, criamos um profile básico ou barramos
+                setError('Perfil de usuário não encontrado no sistema.');
+                await signOut(auth);
             }
         } catch (err: any) {
-            const message = err.response?.data?.error || 'Erro ao realizar login. Tente novamente.';
+            console.error("Erro no login:", err);
+            let message = 'Erro ao realizar login. Tente novamente.';
+            if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+                message = 'Credenciais inválidas. Verifique seu email e senha.';
+            } else if (err.code === 'auth/too-many-requests') {
+                message = 'Muitas tentativas sem sucesso. Tente novamente mais tarde.';
+            }
             setError(message);
         } finally {
             setIsSubmitting(false);
         }
     };
+
 
     return (
         <div className="font-sans bg-mesh text-slate-100 min-h-screen flex flex-col items-center justify-center p-4">

@@ -1,9 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Trash2, Gavel, Plus, Search, Edit2, AlertCircle, MapPin, FileText } from 'lucide-react';
 import { cn } from '../lib/utils';
 import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
 import InfractionForm from '../components/forms/InfractionForm';
+import { infractionService } from '../services/firebase/infraction.service';
+import type { Infraction } from '../services/firebase/infraction.service';
+import { useAuth } from '../store/AuthContext';
+import { toast } from 'react-hot-toast';
 
 const StatCard = ({ title, value, subtitle, trend, type }: any) => (
     <div className="glass-card p-5 rounded-xl border border-white/5 bg-slate-900/40 relative overflow-hidden group">
@@ -33,29 +37,56 @@ const StatCard = ({ title, value, subtitle, trend, type }: any) => (
 );
 
 const Infractions = () => {
+    const { user } = useAuth();
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedDescription, setSelectedDescription] = useState<string | null>(null);
-    const [infractions, setInfractions] = useState<any[]>([]);
+    const [infractions, setInfractions] = useState<Infraction[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    const fetchData = async () => {
+        try {
+            setLoading(true);
+            const data = await infractionService.getAll();
+            // Filter out soft-deleted ones if current service doesn't do it
+            setInfractions(data.filter((i: any) => !i.isDeleted));
+        } catch (error) {
+            console.error('Error fetching infractions:', error);
+            toast.error('Erro ao carregar infrações');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchData();
+    }, []);
 
     const totalInfractions = infractions.length;
     const currentMonthInfractions = infractions.filter(i => {
-        const itemDate = new Date(i.date);
+        const itemDate = i.createdAt ? new Date(i.createdAt) : new Date();
         const now = new Date();
         return itemDate.getMonth() === now.getMonth() && itemDate.getFullYear() === now.getFullYear();
     }).length;
-    const leves = infractions.filter(i => i.severity === 'LEVE').length;
-    const medias = infractions.filter(i => i.severity === 'MÉDIA').length;
-    const graves = infractions.filter(i => i.severity === 'GRAVE').length;
+    const leves = infractions.filter(i => (i.severity as string) === 'LEVE').length;
+    const medias = infractions.filter(i => (i.severity as string) === 'MEDIA' || (i.severity as string) === 'MÉDIA').length;
+    const graves = infractions.filter(i => (i.severity as string) === 'GRAVE').length;
 
     const getPercentage = (count: number) => {
         if (totalInfractions === 0) return '0%';
         return Math.round((count / totalInfractions) * 100) + '%';
     };
 
-    const handleDelete = (id: number) => {
+    const handleDelete = async (id: string) => {
         if (window.confirm("Tem certeza que deseja deletar esta infração?")) {
-            setInfractions(prev => prev.filter(inf => inf.id !== id));
+            try {
+                await infractionService.delete(id);
+                toast.success('Infração deletada com sucesso');
+                fetchData();
+            } catch (error) {
+                console.error('Error deleting infraction:', error);
+                toast.error('Erro ao deletar infração');
+            }
         }
     };
 
@@ -136,7 +167,7 @@ const Infractions = () => {
                         <Edit2 size={14} />
                     </button>
                     <button 
-                         onClick={() => handleDelete(doc.id)} 
+                         onClick={() => handleDelete(doc.id!)} 
                          className="p-1.5 bg-rose-500/10 hover:bg-rose-500/20 rounded-md text-rose-500 transition-colors" title="Deletar">
                         <Trash2 size={14} />
                     </button>
@@ -146,11 +177,23 @@ const Infractions = () => {
     ];
 
     const filteredData = infractions.filter(item => 
-        (item.name && item.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (item.plate && item.plate.toLowerCase().includes(searchTerm.toLowerCase())) || 
         (item.type && item.type.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (item.location && item.location.toLowerCase().includes(searchTerm.toLowerCase()))
     );
+
+    if (loading) {
+        return (
+            <div className="flex-1 flex items-center justify-center bg-background-dark text-slate-100">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
+                    <p className="text-sm font-medium text-slate-400 font-mono tracking-widest uppercase text-center">
+                        Carregando Registro<br/>de Infrações...
+                    </p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex-1 flex flex-col min-w-0 h-full bg-background-dark text-slate-100 overflow-hidden">
@@ -236,7 +279,7 @@ const Infractions = () => {
                 {/* Data Table */}
                 <div className="flex-1 min-h-0 bg-slate-900/40 rounded-xl border border-white/5 overflow-hidden flex flex-col">
                     <div className="flex-1 overflow-auto no-scrollbar">
-                        <DataTable title="Registro de Infrações" columns={columns as any} data={filteredData} hideHeader={true} />
+                        <DataTable title="Registro de Infrações" columns={columns as any} data={filteredData.map(i => ({ ...i, id: i.id || '' }))} hideHeader={true} />
                     </div>
                     <div className="p-3 border-t border-white/5 text-xs text-slate-500 bg-background-dark/50 flex justify-between items-center">
                         <span>Mostrando {filteredData.length > 0 ? '1' : '0'}-{filteredData.length} de {totalInfractions} infrações</span>
@@ -248,21 +291,31 @@ const Infractions = () => {
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Registrar Infração">
                 <InfractionForm 
                     onCancel={() => setIsModalOpen(false)} 
-                    onSubmit={(data) => {
-                        const newInfraction = {
-                            id: Date.now(),
-                            date: data.date, 
-                            time: data.time,
-                            name: data.vehicle.owner || data.vehicle.ownerName,
-                            role: data.vehicle.role,
-                            plate: data.vehicle.plate,
-                            type: data.type,
-                            description: data.description,
-                            location: data.location || (data.gate === 'A' ? 'Portaria A' : 'Portaria E'),
-                            severity: data.severity,
-                        };
-                        setInfractions(prev => [newInfraction, ...prev]);
-                        setIsModalOpen(false);
+                    onSubmit={async (data) => {
+                        try {
+                            setLoading(true);
+                            await infractionService.create({
+                                plate: data.plate,
+                                type: data.type,
+                                location: data.location || (data.gate === 'A' ? 'Portaria A' : 'Portaria E'),
+                                severity: data.severity,
+                                description: data.description,
+                                registeredById: user?.id || 'anonymous',
+                                registeredBy: {
+                                    id: user?.id || 'anonymous',
+                                    fullName: user?.name || user?.email || 'N/A'
+                                }
+                                // Mapped from selectedVehicle
+                            } as any);
+                            toast.success('Infração registrada com sucesso');
+                            setIsModalOpen(false);
+                            fetchData();
+                        } catch (error) {
+                            console.error('Error creating infraction:', error);
+                            toast.error('Erro ao registrar infração');
+                        } finally {
+                            setLoading(false);
+                        }
                     }} 
                 />
             </Modal>

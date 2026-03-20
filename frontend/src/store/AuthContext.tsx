@@ -1,17 +1,20 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { auth, db } from '../lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 interface User {
     id: string;
     name: string;
     email: string;
     role: 'ADMIN' | 'SUPERVISOR' | 'OPERADOR';
+    mustChangePassword?: boolean;
 }
 
 interface AuthContextType {
     user: User | null;
-    token: string | null;
-    login: (token: string, user: User) => void;
-    logout: () => void;
+    login: (userData: User) => void;
+    logout: () => Promise<void>;
     isAuthenticated: boolean;
     isLoading: boolean;
 }
@@ -20,36 +23,55 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
-    const [token, setToken] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        const savedUser = localStorage.getItem('medpark_user');
-        const savedToken = localStorage.getItem('medpark_token');
-        
-        if (savedUser && savedToken) {
-            setUser(JSON.parse(savedUser));
-            setToken(savedToken);
-        }
-        setIsLoading(false);
+        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+            if (firebaseUser) {
+                // Ao detectar um usuário autenticado no Firebase, buscamos os dados adicionais (como role) no Firestore
+                try {
+                    const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+                    if (userDoc.exists()) {
+                        const userData = userDoc.data();
+                        setUser({
+                            id: firebaseUser.uid,
+                            name: userData.fullName || firebaseUser.displayName || 'Usuário',
+                            email: firebaseUser.email || '',
+                            role: userData.role || 'OPERADOR',
+                            mustChangePassword: userData.mustChangePassword
+                        });
+                    } else {
+                        // Fallback se o documento no Firestore ainda não existir
+                        setUser({
+                            id: firebaseUser.uid,
+                            name: firebaseUser.displayName || 'Usuário',
+                            email: firebaseUser.email || '',
+                            role: 'OPERADOR'
+                        });
+                    }
+                } catch (error) {
+                    console.error("Erro ao buscar dados do usuário no Firestore:", error);
+                }
+            } else {
+                setUser(null);
+            }
+            setIsLoading(false);
+        });
+
+        return () => unsubscribe();
     }, []);
 
-    const login = (newToken: string, userData: User) => {
-        setToken(newToken);
+    const login = (userData: User) => {
         setUser(userData);
-        localStorage.setItem('medpark_token', newToken);
-        localStorage.setItem('medpark_user', JSON.stringify(userData));
     };
 
-    const logout = () => {
-        setToken(null);
+    const logout = async () => {
+        await signOut(auth);
         setUser(null);
-        localStorage.removeItem('medpark_token');
-        localStorage.removeItem('medpark_user');
     };
 
     return (
-        <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!user, isLoading }}>
+        <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, isLoading }}>
             {children}
         </AuthContext.Provider>
     );
@@ -62,3 +84,4 @@ export const useAuth = () => {
     }
     return context;
 };
+

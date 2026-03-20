@@ -7,32 +7,8 @@ interface InfractionFormProps {
     onSubmit: (data: any) => void;
 }
 
-import { mockVehicles, mockEmployees, mockProviderVehicles, mockProvidersList } from '../../data/mockData';
-
-const unifiedVehicleDB = [
-    ...mockVehicles.map(v => {
-        const emp = mockEmployees.find(e => e.id === v.ownerId);
-        return {
-            plate: v.plate,
-            owner: v.owner,
-            role: emp?.role || 'FUNCIONÁRIO',
-            model: v.model,
-            color: v.color,
-            type: 'FUNCIONÁRIO'
-        };
-    }),
-    ...mockProviderVehicles.map(v => {
-        const prov = mockProvidersList.find(p => p.id === v.providerId);
-        return {
-            plate: v.plate,
-            owner: v.ownerName,
-            role: prov?.role || 'PRESTADOR',
-            model: v.model,
-            color: v.color,
-            type: 'PRESTADOR'
-        };
-    })
-];
+import { vehicleService } from '../../services/firebase/vehicle.service';
+import { contractorService } from '../../services/firebase/contractor.service';
 
 const GATE_LOCATIONS: Record<string, string[]> = {
     'A': ['Externa', 'Subsolo 1', 'Subsolo 2'],
@@ -52,8 +28,9 @@ const INFRACTION_TYPES = [
 
 const InfractionForm: React.FC<InfractionFormProps> = ({ onCancel, onSubmit }) => {
     const [searchTerm, setSearchTerm] = useState('');
-    const [searchResults, setSearchResults] = useState<typeof unifiedVehicleDB>([]);
+    const [searchResults, setSearchResults] = useState<any[]>([]);
     const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
+    const [isSearching, setIsSearching] = useState(false);
 
     const [formData, setFormData] = useState({
         gate: '', // 'A' | 'E'
@@ -67,14 +44,64 @@ const InfractionForm: React.FC<InfractionFormProps> = ({ onCancel, onSubmit }) =
 
     const [errors, setErrors] = useState<Record<string, string>>({});
 
-    const handleSearch = (term: string) => {
+    const handleSearch = async (term: string) => {
         setSearchTerm(term);
         if (term.length >= 3) {
-            const results = unifiedVehicleDB.filter(v => 
-                v.plate.toLowerCase().includes(term.toLowerCase()) || 
-                v.owner.toLowerCase().includes(term.toLowerCase())
-            );
-            setSearchResults(results);
+            setIsSearching(true);
+            try {
+                // Search in Employee Vehicles
+                const empVehicles = await vehicleService.getAll({ search: term });
+                
+                // Search in Contractor Vehicles
+                const contVehiclesRaw = await contractorService.getAllVehicles();
+                const contVehiclesFiltered = contVehiclesRaw.filter(v => 
+                    v.plate.toUpperCase().includes(term.toUpperCase()) ||
+                    v.model.toUpperCase().includes(term.toUpperCase())
+                );
+
+                // Fetch extra info for contractors if needed
+                const results: any[] = [
+                    ...empVehicles.map(v => ({
+                        id: v.id,
+                        plate: v.plate,
+                        owner: v.employee?.name || 'Staff',
+                        role: 'FUNCIONÁRIO',
+                        model: v.model,
+                        color: v.color,
+                        type: 'FUNCIONÁRIO'
+                    })),
+                    ...contVehiclesFiltered.map(v => ({
+                        id: v.id,
+                        plate: v.plate,
+                        owner: 'Prestador', // We'll try to fetch the contractor name below if possible
+                        contractorId: v.contractorId,
+                        role: 'PRESTADOR',
+                        model: v.model,
+                        color: v.color,
+                        type: 'PRESTADOR'
+                    }))
+                ];
+
+                // For providers, fetch their names if results are few
+                if (results.some(r => r.type === 'PRESTADOR') && results.length < 10) {
+                    const contractors = await contractorService.getAll();
+                    results.forEach(r => {
+                        if (r.type === 'PRESTADOR') {
+                            const cont = contractors.find(c => c.id === r.contractorId);
+                            if (cont) {
+                                r.owner = cont.name;
+                                r.role = cont.role || 'PRESTADOR';
+                            }
+                        }
+                    });
+                }
+
+                setSearchResults(results);
+            } catch (error) {
+                console.error('Error searching vehicles:', error);
+            } finally {
+                setIsSearching(false);
+            }
         } else {
             setSearchResults([]);
         }
@@ -103,13 +130,13 @@ const InfractionForm: React.FC<InfractionFormProps> = ({ onCancel, onSubmit }) =
             return;
         }
 
-        // Make an ISO date string from 'date' and 'time'
-        const combinedDateTime = new Date(`${formData.date}T${formData.time}:00`).toISOString();
-
         onSubmit({
             ...formData,
             vehicle: selectedVehicle,
-            date: combinedDateTime
+            // Date is handled by the service typically, but we pass what the UI expects
+            plate: selectedVehicle.plate,
+            name: selectedVehicle.owner,
+            role: selectedVehicle.role
         });
     };
 
@@ -141,6 +168,11 @@ const InfractionForm: React.FC<InfractionFormProps> = ({ onCancel, onSubmit }) =
                                 >
                                     <X size={16} />
                                 </button>
+                            )}
+                            {isSearching && (
+                                <div className="absolute right-10 top-1/2 -translate-y-1/2">
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-accent"></div>
+                                </div>
                             )}
                         </div>
                         {errors.vehicle && <p className="text-status-error text-[10px] mt-1">{errors.vehicle}</p>}

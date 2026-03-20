@@ -17,7 +17,7 @@ const VehicleForm = ({ onCancel, initialData, onSubmit, employees = [] }: Vehicl
     const searchRef = useRef<HTMLDivElement>(null);
 
     const [formData, setFormData] = useState({
-        ownerId: '',
+        employeeId: '',
         owner: '',
         plate: '',
         model: '',
@@ -31,7 +31,7 @@ const VehicleForm = ({ onCancel, initialData, onSubmit, employees = [] }: Vehicl
     useEffect(() => {
         if (initialData) {
             setFormData({
-                ownerId: initialData.ownerId || '',
+                employeeId: initialData.employeeId || initialData.ownerId || '',
                 owner: initialData.owner || '',
                 plate: initialData.plate || '',
                 model: initialData.model || '',
@@ -67,14 +67,14 @@ const VehicleForm = ({ onCancel, initialData, onSubmit, employees = [] }: Vehicl
     }, [searchQuery, employees]);
 
     const selectedEmployee = useMemo(() => {
-        if (!formData.ownerId) return null;
-        return employees.find(e => e.id.toString() === formData.ownerId);
-    }, [formData.ownerId, employees]);
+        if (!formData.employeeId) return null;
+        return employees.find(e => e.id.toString() === formData.employeeId);
+    }, [formData.employeeId, employees]);
 
     const handleSelectEmployee = (emp: any) => {
         setFormData(prev => ({
             ...prev,
-            ownerId: emp.id.toString(),
+            employeeId: emp.id.toString(),
             owner: emp.name
         }));
         if (errors.owner) setErrors(prev => ({ ...prev, owner: '' }));
@@ -85,7 +85,7 @@ const VehicleForm = ({ onCancel, initialData, onSubmit, employees = [] }: Vehicl
     const validate = () => {
         const newErrors: Record<string, string> = {};
 
-        if (!formData.ownerId) newErrors.owner = 'Pesquise e selecione o proprietário';
+        if (!formData.employeeId) newErrors.owner = 'Pesquise e selecione o proprietário';
         if (!validatePlate(formData.plate)) newErrors.plate = 'Placa inválida';
         if (!formData.model) newErrors.model = 'Modelo é obrigatório';
         if (!formData.color) newErrors.color = 'Cor é obrigatória';
@@ -184,7 +184,7 @@ const VehicleForm = ({ onCancel, initialData, onSubmit, employees = [] }: Vehicl
                                 </div>
                                 <button
                                     type="button"
-                                    onClick={() => setFormData(prev => ({ ...prev, ownerId: '', owner: '' }))}
+                                    onClick={() => setFormData(prev => ({ ...prev, employeeId: '', owner: '' }))}
                                     className="p-1 hover:bg-status-error/10 text-text-secondary hover:text-status-error rounded-md transition-all"
                                 >
                                     <X size={14} />
@@ -217,7 +217,7 @@ const VehicleForm = ({ onCancel, initialData, onSubmit, employees = [] }: Vehicl
                     <div className="flex items-center justify-between">
                         <span className="text-sm font-bold text-text-primary uppercase tracking-tight">{formData.owner}</span>
                         <div className="flex items-center gap-2 px-2 py-0.5 rounded bg-white/5 border border-white/10">
-                            <span className="text-[10px] font-mono text-text-secondary">ID: {formData.ownerId}</span>
+                            <span className="text-[10px] font-mono text-text-secondary">ID: {formData.employeeId}</span>
                         </div>
                     </div>
                 </div>

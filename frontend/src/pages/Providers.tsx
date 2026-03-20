@@ -15,17 +15,24 @@ import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
-import { mockCompanies, mockProvidersList, mockProviderVehicles } from '../data/mockData';
-import api from '../services/api';
+import { toast } from 'react-hot-toast';
+
+// Services
+import { companyService } from '../services/firebase/company.service';
+import type { Company } from '../services/firebase/company.service';
+import { contractorService } from '../services/firebase/contractor.service';
+import type { Contractor, ContractorVehicle } from '../services/firebase/contractor.service';
+
 import { maskCPF, maskCNPJ, maskPhone, maskPlate } from '../lib/masks';
 import { validateCPF, validateCNPJ, validatePhone, validatePlate } from '../lib/validation';
 
 const Providers = () => {
     const [view, setView] = useState<'companies' | 'providers' | 'vehicles'>('companies');
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [companies, setCompanies] = useState(mockCompanies);
-    const [providers, setProviders] = useState(mockProvidersList);
-    const [vehicles, setVehicles] = useState(mockProviderVehicles);
+    const [companies, setCompanies] = useState<Company[]>([]);
+    const [providers, setProviders] = useState<Contractor[]>([]);
+    const [vehicles, setVehicles] = useState<ContractorVehicle[]>([]);
+    const [loading, setLoading] = useState(true);
     const [selectedItem, setSelectedItem] = useState<any>(null);
     const [statusFilter] = useState<'TODOS' | 'ATIVO' | 'INATIVO'>('TODOS');
     const [modalType, setModalType] = useState<'main' | 'provider' | 'vehicle' | 'edit'>('main');
@@ -59,18 +66,45 @@ const Providers = () => {
     // Page Search State (Table)
     const [pageSearchTerm, setPageSearchTerm] = useState('');
 
+    // Fetch Initial Data
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const [cData, pData] = await Promise.all([
+                companyService.getAll(),
+                contractorService.getAll()
+            ]);
+            setCompanies(cData);
+            setProviders(pData);
+            
+            // Get all vehicles for all contractors
+            const vDataPromises = pData.map(p => contractorService.getVehicles(p.id!));
+            const vResults = await Promise.all(vDataPromises);
+            setVehicles(vResults.flat());
+        } catch (error) {
+            console.error('Error fetching data:', error);
+            toast.error('Erro ao carregar dados');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchData();
+    }, []);
+
     // Handle internal company search for "Novo Prestador"
     useEffect(() => {
         if (companySearch.length >= 2) {
-            const results = mockCompanies.filter(c =>
+            const results = companies.filter(c =>
                 c.name.toLowerCase().includes(companySearch.toLowerCase()) ||
-                c.cnpj.includes(companySearch)
+                c.taxId.includes(companySearch)
             );
             setCompanyResults(results);
         } else {
             setCompanyResults([]);
         }
-    }, [companySearch]);
+    }, [companySearch, companies]);
 
     const handleAddMain = () => {
         setSelectedItem(null);
@@ -106,112 +140,152 @@ const Providers = () => {
     const handleEdit = (item: any) => {
         setSelectedItem(item);
         setModalType('edit');
+        if (view === 'companies') {
+            setCompName(item.name);
+            setCompCnpj(item.taxId);
+            setCompRole(item.segment);
+            setCompPhone(item.contact || '');
+        } else if (view === 'providers') {
+            setProviderName(item.name);
+            setProviderCpf(maskCPF(item.cpf));
+            setProviderRole(item.role || '');
+            setProviderPhone(maskPhone(item.phone || ''));
+            setSelectedCompany(companies.find(c => c.id === item.companyId) || null);
+            setIsAutonomousProvider(!item.companyId);
+        }
         setIsModalOpen(true);
     };
 
-    const handleToggleStatus = (item: any) => {
-        const updateStatus = (list: any[]) => list.map(i =>
-            i.id === item.id ? { ...i, status: i.status === 'ATIVO' ? 'INATIVO' : 'ATIVO' } : i
-        );
-
-        if (view === 'companies') setCompanies(updateStatus);
-        else if (view === 'providers') setProviders(updateStatus);
-        else setVehicles(updateStatus);
+    const handleToggleStatus = async (item: any) => {
+        try {
+            if (view === 'companies') {
+                await companyService.update(item.id, { status: item.status === 'ATIVO' ? 'INATIVO' : 'ATIVO' });
+                toast.success('Status da empresa atualizado');
+            } else if (view === 'providers') {
+                await contractorService.update(item.id, { status: item.status === 'ATIVO' ? 'INATIVO' : 'ATIVO' });
+                toast.success('Status do prestador atualizado');
+            }
+            fetchData();
+        } catch (error) {
+            console.error(error);
+            toast.error('Erro ao atualizar status');
+        }
     };
 
     const handleSaveProvider = async () => {
         if (!validateCPF(providerCpf)) {
-            alert('Por favor, informe um CPF válido.');
+            toast.error('Por favor, informe um CPF válido.');
             return;
         }
 
         if (providerPhone && !validatePhone(providerPhone)) {
-            alert('Por favor, informe um telefone completo com DDD.');
+            toast.error('Por favor, informe um telefone completo com DDD.');
             return;
         }
 
         if (!providerName) {
-            alert('Por favor, preencha o nome.');
+            toast.error('Por favor, preencha o nome.');
             return;
         }
 
         if (!isAutonomousProvider && !selectedCompany) {
-            alert('Por favor, selecione uma empresa ou marque como autônomo.');
+            toast.error('Por favor, selecione uma empresa ou marque como autônomo.');
             return;
         }
 
         setIsSubmitting(true);
         try {
-            // 1. Criar Prestador
-            const providerRes = await api.post('/contractors', {
-                name: providerName,
-                cpf: providerCpf,
-                role: providerRole,
-                phone: providerPhone,
-                companyId: selectedCompany?.id || null,
-                requester: solicitante,
-                destination: destino
-            });
-
-            const newProvider = providerRes.data;
-
-            // 2. Se tiver veículo, cadastra
-            if (!isPedestrianProvider && vPlate) {
-                if (!validatePlate(vPlate)) {
-                    alert('Placa inválida. Use o formato ABC-1234 ou ABC1D23.');
-                    setIsSubmitting(false);
-                    return;
-                }
-
-                await api.post(`/contractors/${newProvider.id}/vehicles`, {
-                    plate: vPlate,
-                    model: vModel,
-                    color: vColor,
-                    companyId: selectedCompany?.id || null
+            if (selectedItem) {
+                // Update
+                await contractorService.update(selectedItem.id, {
+                    name: providerName,
+                    cpf: providerCpf.replace(/\D/g, ''),
+                    role: providerRole,
+                    phone: providerPhone.replace(/\D/g, ''),
+                    companyId: isAutonomousProvider ? '' : selectedCompany?.id || '',
                 });
+                toast.success('Prestador atualizado com sucesso!');
+            } else {
+                // Create
+                const newProvider = await contractorService.create({
+                    name: providerName,
+                    cpf: providerCpf.replace(/\D/g, ''),
+                    role: providerRole,
+                    phone: providerPhone.replace(/\D/g, ''),
+                    companyId: isAutonomousProvider ? '' : selectedCompany?.id || '',
+                    manager: solicitante,
+                });
+
+                // 2. Se tiver veículo, cadastra
+                if (!isPedestrianProvider && vPlate) {
+                    if (!validatePlate(vPlate)) {
+                        toast.error('Placa inválida. Use o formato ABC-1234 ou ABC1D23.');
+                        setIsSubmitting(false);
+                        return;
+                    }
+
+                    await contractorService.addVehicle(newProvider.id!, isAutonomousProvider ? '' : selectedCompany?.id || '', {
+                        plate: vPlate.toUpperCase(),
+                        model: vModel.toUpperCase(),
+                        color: vColor.toUpperCase()
+                    });
+                }
+                toast.success('Prestador cadastrado com sucesso!');
             }
 
-            // 3. Atualizar Lista ( Ideal seria Re-fetch, mas vamos adicionar ao state para feedback imediato)
-            setProviders([newProvider, ...providers]);
+            fetchData();
             setIsModalOpen(false);
-            alert('Prestador cadastrado com sucesso!');
-
         } catch (error: any) {
             console.error(error);
-            alert(error.response?.data?.error || 'Erro ao salvar prestador.');
+            toast.error(error.message || 'Erro ao salvar prestador.');
         } finally {
             setIsSubmitting(false);
         }
     };
 
     const handleSaveMain = async () => {
-        if (!validateCPF(providerCpf)) {
-            alert('CPF inválido.');
-            return;
-        }
-
         if (!isAutonomous && !validateCNPJ(compCnpj)) {
-            alert('CNPJ inválido.');
+            toast.error('CNPJ inválido.');
             return;
         }
 
         if (compPhone && !validatePhone(compPhone)) {
-            alert('Telefone inválido.');
+            toast.error('Telefone inválido.');
             return;
         }
 
         if (!isAutonomous && !compName) {
-            alert('Razão Social é obrigatória para empresas.');
+            toast.error('Razão Social é obrigatória para empresas.');
             return;
         }
 
-        if (!isPedestrian && vPlate && !validatePlate(vPlate)) {
-            alert('Placa inválida.');
-            return;
+        setIsSubmitting(true);
+        try {
+            if (selectedItem) {
+                await companyService.update(selectedItem.id, {
+                    name: compName,
+                    taxId: compCnpj.replace(/\D/g, ''),
+                    segment: compRole,
+                    contact: compPhone,
+                });
+                toast.success('Empresa atualizada com sucesso!');
+            } else {
+                await companyService.create({
+                    name: compName,
+                    taxId: compCnpj.replace(/\D/g, ''),
+                    segment: compRole,
+                    contact: compPhone,
+                });
+                toast.success('Empresa cadastrada com sucesso!');
+            }
+            fetchData();
+            setIsModalOpen(false);
+        } catch (error: any) {
+            console.error(error);
+            toast.error(error.message || 'Erro ao realizar cadastro.');
+        } finally {
+            setIsSubmitting(false);
         }
-
-        alert('Cadastro realizado com sucesso! (Integração Backend pendente para este formulário unificado)');
-        setIsModalOpen(false);
     };
 
     const companyColumns: any[] = [
@@ -230,11 +304,11 @@ const Providers = () => {
         { header: 'Empresa', accessor: 'name', className: 'font-semibold' },
         { header: 'CNPJ/Seguimento', accessor: (item: any) => (
             <div className="flex flex-col">
-                <span className="font-mono">{item.cnpj}</span>
-                <span className="text-[10px] text-slate-500 font-bold uppercase">{item.segment || item.role}</span>
+                <span className="font-mono">{maskCNPJ(item.taxId)}</span>
+                <span className="text-[10px] text-slate-500 font-bold uppercase">{item.segment}</span>
             </div>
         ) },
-        { header: 'Contato', accessor: 'contact' },
+        { header: 'Contato', accessor: (item: any) => maskPhone(item.contact || '') },
         { header: 'Solicitante / Destino', accessor: (item: any) => (
             <div className="flex flex-col gap-1">
                 {item.requester ? (
@@ -284,11 +358,11 @@ const Providers = () => {
         { header: 'Nome Completo', accessor: 'name', className: 'font-semibold' },
         { header: 'CPF/Cargo', accessor: (item: any) => (
             <div className="flex flex-col">
-                <span>{item.cpf}</span>
+                <span className="font-mono">{maskCPF(item.cpf)}</span>
                 <span className="text-[10px] text-slate-500 font-bold uppercase">{item.role}</span>
             </div>
         ) },
-        { header: 'Telefone', accessor: 'phone' },
+        { header: 'Telefone', accessor: (item: any) => maskPhone(item.phone || '') },
         { header: 'Solicitante / Destino', accessor: (item: any) => (
             <div className="flex flex-col gap-1">
                 {item.requester ? (
@@ -342,7 +416,7 @@ const Providers = () => {
             header: 'Data de Cadastro',
             accessor: (item: any) => {
                 if (!item.createdAt) return '-';
-                const date = new Date(item.createdAt);
+                const date = (item.createdAt as any)?.toDate ? (item.createdAt as any).toDate() : new Date(item.createdAt);
                 return (
                     <div className="flex flex-col text-[10px] leading-tight opacity-80">
                         <span className="font-bold">{date.toLocaleDateString('pt-BR')}</span>
