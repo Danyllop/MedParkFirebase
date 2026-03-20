@@ -2,14 +2,14 @@ import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
 
-// O usuário deve substituir estas configurações pelas do seu console Firebase
+// O usuário deve substituir estas configurações pelas do seu console Firebase (ATUALIZADO)
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "SUA_API_KEY",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "seu-projeto.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "seu-projeto-id",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "seu-projeto-firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "sua-ID",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "sua-APP-ID"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyC-7dVFd1ZYP1DGa8lRpMivMsz5GDZs4HQ",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "medpark-saas.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "medpark-saas",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "medpark-saas.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "418562245724",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:418562245724:web:e6cd56193a29fe3266d299"
 };
 
 // Inicializa Firebase
